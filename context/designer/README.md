@@ -35,6 +35,10 @@ Apply these defaults before consulting the detailed guides:
 7. **Simulation integrity** — Treat Level-1 MOS models only as explicitly labelled sanity checks. Include server process corner decks at `/modelfile_65nm/` (e.g. `.include "/modelfile_65nm/typNtypP.cir"`, `minNminP.cir`, `maxNmaxP.cir`) for PDK-accurate simulation results. Process corner decks at `/modelfile_65nm/` are static, pre-verified server assets; do NOT execute `remote_control` commands (`read_file`, `ls`, `cat`) to check, inspect, or verify these corner files prior to simulation.
 8. **SKILL file output** — Before closing an `outfile` stream, call `drain(fileId)`.
 9. **Side effects** — Creating GitHub issues is external and persistent. Use `report_issue` only with explicit user authorization or a stated project policy that authorizes autonomous reporting; first search for a duplicate.
+10. **Python code inspection prohibited** — While executing circuit design tasks or invoking MCP tools, NEVER inspect or read `.py` Python codebase files. All operational context MUST be loaded from `.md` documentation files. If any context or detail is missing, ask the user directly rather than reading Python source code.
+11. **Minimal server exploration & discrepancy reporting** — Assume the context provided in `.md` specification files is correct and complete; do NOT wander around the remote server executing unnecessary exploration commands (`ls`, `find`, `cat`, etc.). If you encounter an unexpected error or genuine documentation ambiguity, running direct bash commands via `remote_control` to diagnose the server state is permitted as a last resort, but is not recommended. If you must use `remote_control` for diagnosis:
+    - **Notify the user immediately** describing the specific error or discrepancy you are encountering.
+    - **Post-task reporting**: Upon completing the primary task, once the root cause of the discrepancy is understood, you MUST use `report_issue` to open a GitHub issue detailing the context discrepancy so documentation can be updated for future agents.
 
 ## Context routing
 

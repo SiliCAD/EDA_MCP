@@ -56,6 +56,10 @@ TASK INTENT CLASSIFICATION                  MANDATORY SPECIFICATION TO READ (vie
 8. `NETLIST_EXTRACTION`: DO NOT hand-write SPICE transistor netlists for Eldo. Programmatically extract structural netlist `<cellName>.net` from the Virtuoso schematic (`MCP` library) and wrap it using `.include "<cellName>.net"` inside the Eldo simulation config deck (`tb_<cellName>.cir`).
 9. `ELDO_TITLE`: Line 1 of every Eldo `.cir` netlist is strictly treated as a title comment line.
 10. `STATIC_CORNER_DECKS`: Process corner decks at `/modelfile_65nm/` (`typNtypP.cir`, `minNminP.cir`, `maxNmaxP.cir`, `maxNminP.cir`, `minNmaxP.cir`) are static, pre-verified server assets. DO NOT execute `remote_control` commands (`read_file`, `cat`, `ls`) to inspect or verify corner decks prior to simulation.
+11. `NO_PYTHON_READ`: While working with MCP tools / circuit design, NEVER read `.py` Python code. All required context MUST be available in the `.md` documentation files (e.g. `context/designer/README.md`). If any information is missing or unclear, ask the user directly, but DO NOT read Python source code.
+12. `MINIMAL_SERVER_EXPLORATION`: Assume `.md` specification files are complete and correct. DO NOT wander around the remote server with unnecessary commands (`ls`, `find`, `cat`). If an error/ambiguity forces direct bash diagnosis via `remote_control` (not recommended):
+    - **Notify the user immediately** of the exact problem being investigated.
+    - **Post-task issue creation**: After completing the task and diagnosing the issue, invoke `report_issue` to log the context discrepancy on GitHub for future agent improvements.
 
 ---
 
