@@ -6,7 +6,12 @@ We have implemented a highly modular, state-isolated, and scalable architecture 
 
 ## 📹 Demo Video
 
-<video src="https://github.com/user-attachments/assets/091cc42f-4188-4e31-8d5c-49ad20e18e45" autoplay loop muted playsinline controls width="100%"></video>
+<video src="https://raw.githubusercontent.com/SiliCAD/EDA_MCP/main/doc/media/demo.mp4" autoplay loop muted playsinline controls width="100%"></video>
+
+<p>
+  If the inline demo does not play in your viewer, open/download the file directly:
+  <a href="https://github.com/SiliCAD/EDA_MCP/raw/main/doc/media/demo.mp4">View / Download demo.mp4 (raw)</a>
+</p>
 
 *(Video Source: [`doc/media/demo.mp4`](file:///Users/vs/function/EDA_MCP/doc/media/demo.mp4))*
 
@@ -21,8 +26,8 @@ We have implemented a highly modular, state-isolated, and scalable architecture 
                                   │      virtuoso, eldo)      │
                                   └──────────────┬────────────┘
                                                  │
-          ┌──────────────────────────────────────┼──────────────────────────────────────┐
-          ▼                                      ▼                                      ▼
+         ┌──────────────────────────────────────┼──────────────────────────────────────┐
+         ▼                                      ▼                                      ▼
 ┌───────────────────────────┐          ┌───────────────────────────┐          ┌───────────────────────────┐
 │      remote_session       │          │    virtuoso_client.py     │          │      eldo_client.py       │
 │(config_remote_control.json│          │   (VirtuosoClient Class)  │          │    (EldoClient Class)     │
