@@ -77,10 +77,10 @@ Modern Integrated Circuit (IC) design demands high-performance Linux compute clu
 #### ⚡ Siemens Eldo Interactive SPICE Architecture
 ```
 [Local Agent] ──> FastMCP (`eldo`) ──> SSH ──> FIFO Pipe `interactive.fifo` (Held open by `tail -f /dev/null`)
-                                                              │
-                                                              ▼
-                                                   `eldo -inter` REPL
-                                                              │
+                                                                                                     │
+                                                                                                     ▼
+                                                                                          `eldo -inter` REPL
+                                                                                                     │
 [Local Agent] <── FastMCP (`eldo`) <── SSH <── Reads `interactive_out.txt` <── Output Stream <───────┘
 ```
 
