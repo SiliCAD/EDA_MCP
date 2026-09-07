@@ -51,3 +51,10 @@ Agent can execute terminal commands inside `./workboard/<name>/`:
 
 ## 4. Local Tooling & Sizing Computation Authorization
 - Agents may use local tools to calculate transistor aspect ratios ($W/L$), evaluate equations, analyze retrieved results, and author **simulation decks**. Structural transistor netlists must come from the verified Virtuoso exporter, not local reconstruction.
+
+---
+
+## 5. File Encoding & Non-UTF8 Character Handling
+- EDA tool outputs (such as Calibre DRC summary decks, `.chi` Eldo log files, or `.db` reports) frequently contain Latin-1 / ISO-8859-1 encoded characters (e.g. byte `0xb5` representing `µm`).
+- All WorkBoard diff, read, and pull operations automatically decode files using UTF-8 with fallback replacement (`errors="replace"`) to prevent decoder crashes (`UnicodeDecodeError`).
+- When authoring local simulation decks or inspecting report files, ensure non-ASCII symbols use standard ASCII units (`um`, `ns`, `mV`) where required by EDA tool syntax.

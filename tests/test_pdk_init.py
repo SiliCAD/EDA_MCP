@@ -27,10 +27,10 @@ class TestPdkInitSpec(unittest.TestCase):
             content = f.read()
 
         # Check that initMosTransistor is used in Template A
-        self.assertIn('initMosTransistor(pInst "2.0" "0.065")', content)
-        self.assertIn('initMosTransistor(nInst "1.0" "0.065")', content)
-        # Verify the warning comment discouraging raw float meters is present
-        self.assertIn("Do NOT assign raw float meters", content)
+        self.assertIn('initMosTransistor(p "2.0" "0.065")', content)
+        self.assertIn('initMosTransistor(n "1.0" "0.065")', content)
+        # Verify CDF callback guidance is present
+        self.assertIn("do not assign meter-valued raw properties", content)
 
 if __name__ == "__main__":
     unittest.main()

@@ -447,9 +447,28 @@ class WorkBoardClient:
         """
         Reports file-wise status of all tracked files in the WorkBoard, detailing
         mapped remote paths, sync commit baselines, and local Git states.
+        If workboard_name is omitted and multiple WorkBoards exist, lists all available WorkBoards.
         """
         wb_name, err = self._resolve_workboard_name(workboard_name)
         if err:
+            existing = self._list_workboards()
+            if len(existing) > 1 and not workboard_name.strip():
+                output = [f"Multiple WorkBoards exist ({len(existing)} found):"]
+                for wb in existing:
+                    wb_dir = self._get_workboard_dir(wb)
+                    registry = self._load_registry(wb_dir, wb)
+                    files_dict = registry.get("files", {})
+                    output.append(f"\n--- WorkBoard: '{wb}' ({len(files_dict)} tracked file(s)) ---")
+                    output.append(f"  Local Root: {wb_dir}")
+                    if not files_dict:
+                        output.append("  No files registered yet.")
+                    else:
+                        for rel, meta in files_dict.items():
+                            remote_path = meta.get("remote_path", "Unmapped")
+                            sync_commit = meta.get("last_sync_commit", "UNKNOWN")
+                            output.append(f"  • {rel} -> {remote_path} (Baseline commit: {sync_commit})")
+                output.append("\nTip: Specify 'workboard_name' to target a specific WorkBoard.")
+                return "\n".join(output)
             return err
 
         wb_dir = self._get_workboard_dir(wb_name)
