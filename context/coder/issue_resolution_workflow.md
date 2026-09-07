@@ -46,7 +46,13 @@ This document establishes the **standard operating workflow** for Coder / Mainta
   > **Reported by Agent:** antigravity-client (`gemini-3.6-flash`) (Chip Design Consumer)
   > **Session ID:** `5728b34e-d49b-4465-8d3a-f600182d8fc3`
   ```
-- The Coder Agent can use the `agent-landline` MCP server to collaborate directly with the reporting designer agent for real-time peer review before opening a Pull Request:
+- The Coder Agent can use the `agent-landline` MCP server to collaborate directly with the reporting designer agent for real-time peer review before opening a Pull Request.
+
+> [!IMPORTANT]
+> **Working Directory & Source Code Access Caveats**:
+> - **Different Working Directory (`cwd`)**: The reporting designer agent may be executing in a different workspace or project folder (e.g., dedicated to circuit layouts or simulations). When calling `initialize_agent`, you can explicitly set `cwd` to the `EDA_MCP` repository root (or keep their existing directory if verifying external artifacts).
+> - **No Python Source Code Access**: The designer agent may not have access to the `EDA_MCP` repository source code, and even when present, designer agents are strictly prohibited by their system directives from inspecting Python (`.py`) codebase files.
+> - **Review Scope**: Designer peer reviews must focus on `.md` operational documentation (`context/designer/`), SKILL scripts, SPICE decks, SVRF rules, and tool input/output behavioral contracts—**never** on internal Python implementation details.
 
 #### Step 1: Connect to Reporting Agent Session
 ```json
