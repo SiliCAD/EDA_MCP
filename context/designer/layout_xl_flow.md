@@ -7,10 +7,13 @@ This guide establishes the operational specification for generating, placing, ro
 ## 1. Fast-Agent Layout XL Execution Contract
 
 1. **Never use basic Layout L (`geOpen`)**: Calling `geOpen` opens Layout L, which is purely polygonal and lacks schematic connectivity binding or cross-probing. Always use the 3-step `Layout XL` launch procedure (`lxSetConnRef` $\rightarrow$ `deOpen` in `"Layout XL"`).
-2. **Window-First Assisted Run**: In `assisted_run`, ensure the Layout XL canvas window is opened FIRST so all component placement, routing, and pin generation are visually visible in the open window.
-3. **M1 Pin Specification during GFS**: When running Generate From Source (`lxGenerateStart`/`lxGenerateFinish`), always retarget pins to Metal 1 (`"M1" "pin"`, width/height $0.2\,\mu\text{m}$) using `lxSetNetPinSpecs` to prevent default $60\text{nm}$ unlabelled poly pins.
-4. **Via Creation Rule**: Never instantiate contact cells via `dbCreateInstByMasterName(..., "M1_PO")`—this triggers PDK DK popup warnings. Always use OpenAccess standard via definitions via `techFindViaDefByName` and `dbCreateVia`.
-5. **Layout-to-Schematic Verification**: A layout is only considered complete when `lxCheckAgainstSource(schCV layCV)` reports 0 mismatches and `layCV~>markers` is `nil`.
+2. **The `deOpen` Return Type Trap**: `deOpen` returns a **Window ID** (e.g. `window:19`), **NOT** a database cellview pointer (`db:0x...`). You MUST extract `layCV = geGetWindowCellView(win)` and call `hiSetCurrentWindow(win)` before passing `layCV` into database functions.
+3. **Dynamic Terminal Extraction for GFS**: Never hardcode pin lists or use `dbFindOpenCellView`. Open the schematic with `dbOpenCellViewByType(..., "r")`, extract `schNets = schCV~>terminals~>name`, and retarget pins to Metal 1 (`"M1" "pin"`, width/height $0.2\,\mu\text{m}$) using `lxSetNetPinSpecs`.
+4. **Mandatory Underlying `M1 drawing` for `M1.PIN.CAD.1`**: GFS creates shapes on `("M1" "pin")`. Foundry rule `M1.PIN.CAD.1` strictly requires an underlying `("M1" "drawing")` polygon bound to the net (`dbAddFigToNet`) under every pin figure.
+5. **OpenAccess Standard Via Definitions**: Never instantiate contact cells via `dbCreateInstByMasterName(..., "M1_PO")`—this triggers PDK DK popup warnings that block the FIFO pipe. Always use OpenAccess standard via definitions via `techFindViaDefByName` and `dbCreateVia`.
+6. **Continuous Tap Straps & Dual-Tap Rule**: Minimal standalone tap vias enclose only $0.0225\,\mu\text{m}^2$, violating `OD.A.1` ($\ge 0.054\,\mu\text{m}^2$) and `NP.A.1` ($\ge 0.122\,\mu\text{m}^2$). Always place tap vias inside continuous diffusion/implant straps ($W \ge 0.5\,\mu\text{m}$). Always instantiate BOTH an N-well tap (`M1__NW` on `VDD`) and a P-substrate tap (`M1__PT` on `VSS`) within $30\,\mu\text{m}$ to satisfy latch-up rule `LUP.D.1_LUP.D.2`.
+7. **Manufacturing Grid Snapping ($5\,\text{nm}$)**: All geometry coordinates must be snapped to $0.005\,\mu\text{m}$ to prevent `OFFGRID` markers in Virtuoso and `GEN.4` violations in Calibre.
+8. **Layout-to-Schematic Verification Gate**: A layout is only considered complete when `lxCheckAgainstSource(schCV layCV)` reports 0 mismatches and `layCV~>markers` is `nil`.
 
 ---
 
@@ -30,7 +33,10 @@ dbClose(cvLay)
 lxSetConnRef("MCP" "<cell>" "layout" "CELLVIEW" ?schLib "MCP" ?schCell "<cell>" ?schView "schematic")
 
 ;; 3. Open cellview in Layout XL application tier
-deOpen(list(nil ?lib "MCP" ?cell "<cell>" ?view "layout") nil "a" "Layout XL")
+;; CRITICAL: deOpen returns a Window ID object (e.g. window:19), NOT a database pointer!
+win = deOpen(list(nil ?lib "MCP" ?cell "<cell>" ?view "layout") nil "a" "Layout XL")
+layCV = geGetWindowCellView(win)
+hiSetCurrentWindow(win)
 ```
 
 ### Verification
@@ -43,24 +49,42 @@ Run `lxGetConnRef(layCV)` on the open layout view. It must return:
 
 ## 3. How to Generate From Source (GFS)
 
-Layout XL provides a programmatic generation lifecycle API:
+Layout XL provides a programmatic generation lifecycle API. Always load the schematic view robustly and query its terminals dynamically:
 
 ```lisp
-schCV = dbFindOpenCellView(ddGetObj("MCP") "<cell>" "schematic")
+;; 1. Safely open schematic database pointer (avoids dbFindOpenCellView returning nil)
+schCV = dbOpenCellViewByType("MCP" "<cell>" "schematic" "schematic" "r")
 layCV = geGetWindowCellView(hiGetCurrentWindow())
 
-;; 1. Start generation session
+;; 2. Dynamically extract all interface pin nets (generalizes to any cell topology)
+schNets = schCV~>terminals~>name
+
+;; 3. Start generation session
 lxGenerateStart(schCV layCV)
 
-;; 2. Crucial: retarget pins to Metal 1 (M1) with valid dimensions
-;; Avoids default 60nm unlabelled PO pins which fail pin CAD enclosure checks
-lxSetNetPinSpecs(?nets '("IN" "OUT" "VDD" "VSS") ?lpp '("M1" "pin") ?width 0.2 ?height 0.2)
+;; 4. Retarget pins to Metal 1 (M1) with valid dimensions (0.2um x 0.2um)
+;; Prevents default 60nm unlabelled PO pins which fail pin CAD enclosure checks
+lxSetNetPinSpecs(?nets schNets ?lpp '("M1" "pin") ?width 0.2 ?height 0.2)
 
-;; 3. Finish generation
+;; 5. Finish generation
 lxGenerateFinish(schCV layCV)
 
-;; 4. Create visible text labels centered on each pin figure
-;; Ensures terminals are visually identifiable in the Virtuoso canvas
+;; 6. Mandatory post-GFS fix for M1.PIN.CAD.1 compliance:
+;; lxSetNetPinSpecs creates shapes on ("M1" "pin"). Foundry rule M1.PIN.CAD.1 strictly
+;; requires an underlying ("M1" "drawing") rectangle of equal/larger size bound to the net:
+foreach(term layCV~>terminals
+  foreach(pin term~>pins
+    let((fig rect)
+      fig = pin~>fig
+      when(fig
+        rect = dbCreateRect(layCV list("M1" "drawing") fig~>bBox)
+        dbAddFigToNet(rect term~>net)
+      )
+    )
+  )
+)
+
+;; 7. Create visible text labels centered on each pin figure
 procedure(createPinLabel(layCV netName pt)
   dbCreateLabel(layCV list("M1" "pin") pt netName "centerCenter" "R0" "roman" 0.05)
 )
@@ -108,7 +132,9 @@ Native placement and routing tools frequently produce non-optimal analog geometr
 | **Circuitous Net OUT Routing** | Misaligned drains force VSR to route a giant U-turn loop out to $X = 2.2\,\mu\text{m}$, creating high parasitic $R$ and $C$. | Replace with a single straight vertical Metal 1 bar directly between drains, tapping directly right to pin `OUT`. |
 | **Layer Hops & Redundant Vias** | VSR adds 5 vias and hops into Metal 2 to connect gate poly. | Replace with a continuous straight vertical Poly line (`PO drawing`). Metal 2 usage is reduced to zero. |
 | **Unauthorized Via Instance Popup** | Instantiating contact cells via `dbCreateInstByMasterName(..., "M1_PO")` triggers PDK DesignKit popup warnings. | Use OpenAccess standard via definitions: `vd = techFindViaDefByName(tf "M1__PO")`, then `dbCreateVia(layCv vd pt "R0")`. |
-| **Floating Power Pins** | VDD/VSS are placed as small floating squares without distribution rails. | Create continuous top horizontal M1 `VDD` rail with N-well tap (`M1__NW`) and bottom horizontal M1 `VSS` rail with substrate tap (`M1__PT`). |
+| **Tap Via Minimum Area Violations** | Standalone tap via cuts enclose only $0.0225\,\mu\text{m}^2$, violating `OD.A.1` ($\ge 0.054\,\mu\text{m}^2$) and `NP.A.1` ($\ge 0.122\,\mu\text{m}^2$). | Draw continuous horizontal diffusion (`OD`) and implant (`NP`/`PP`) straps ($W \ge 0.5\,\mu\text{m}$) along power rails enclosing tap vias. |
+| **Latch-Up Dual-Tap Missing** | Omitting substrate tap on `VSS` or well tap on `VDD` within $30\,\mu\text{m}$ triggers `LUP.D.1_LUP.D.2`. | Always instantiate BOTH an N-well tap (`M1__NW` on `VDD`) and a P-substrate tap (`M1__PT` on `VSS`). |
+| **Floating Power Pins** | VDD/VSS are placed as small floating squares without distribution rails. | Create continuous top horizontal M1 `VDD` rail with N-well tap and bottom horizontal M1 `VSS` rail with substrate tap. |
 
 ### Standard Via Creation Pattern (Bypassing PDK Popups)
 
@@ -119,13 +145,23 @@ tf = techGetTechFile(layCV)
 vd_po = techFindViaDefByName(tf "M1__PO")
 dbCreateVia(layCV vd_po list(x_poly y_poly) "R0")
 
-;; M1 to N-Well Tap (VDD)
+;; M1 to N-Well Tap (VDD) - place inside continuous OD & NW strap
 vd_nw = techFindViaDefByName(tf "M1__NW")
 dbCreateVia(layCV vd_nw list(x_tap_n y_tap_n) "R0")
 
-;; M1 to P-Substrate Tap (VSS)
+;; M1 to P-Substrate Tap (VSS) - place inside continuous OD & PT strap
 vd_pt = techFindViaDefByName(tf "M1__PT")
 dbCreateVia(layCV vd_pt list(x_tap_p y_tap_p) "R0")
+```
+
+### Manufacturing Grid Snapping ($5\,\text{nm}$)
+
+In `cmos065`, the manufacturing grid is strictly $0.005\,\mu\text{m}$ ($5\,\text{nm}$). Any un-snapped coordinate triggers `OFFGRID` markers in Virtuoso and `GEN.4` DRC errors in Calibre. Use this helper when calculating coordinates:
+
+```lisp
+procedure(snapGrid(val @optional (grid 0.005))
+  round(val / grid) * grid
+)
 ```
 
 ---

@@ -15,8 +15,8 @@ Apply these defaults before consulting the detailed guides:
 7. Build `tb_<cell>.cir` in WorkBoard (use `write_to_file` without `ArtifactMetadata` for workspace files, or write `.txt` and `mv` to `.cir`), include process corner, and run Eldo from testbench—not raw `.net`.
 8. Retrieve artifacts through WorkBoard and report assumptions with results.
 9. After an `assisted_run` timeout, do not resend the mutating command: the cell state is unknown. Recover, inspect, and continue from observed state.
-10. For layout creation, never use plain `geOpen` (Layout L). Bind connectivity reference to schematic (`lxSetConnRef`) and open in `"Layout XL"` application tier (`deOpen`).
-11. In Calibre DRC stream-out (`strmout`), always pass the official PDK layer map (`DK_cmos065lpgp_.../cmos065.layermap`) to avoid the `R_forbidden.1` trap (Layer 15 vs 31). Exclude density checks (`group_unselect density`) for isolated leaf cells.
+10. For layout creation, never use plain `geOpen` (Layout L). Bind connectivity reference to schematic (`lxSetConnRef`) and open in `"Layout XL"` application tier (`win = deOpen(...)`, then extract `layCV = geGetWindowCellView(win)` and `hiSetCurrentWindow(win)`).
+11. In Calibre DRC stream-out (`strmout`), always pass the official PDK layer map (`DK_cmos065lpgp_.../cmos065.layermap`) and `-case Preserve` to avoid the `R_forbidden.1` trap (Layer 15 vs 31). In headless batch decks, unselect density checks (`DRC UNSELECT CHECK ALL_DENSITY_CHECK`) for isolated leaf cells.
 
 ## Authority, scope, and judgment
 
@@ -41,8 +41,8 @@ Apply these defaults before consulting the detailed guides:
 11. **Minimal server exploration & discrepancy reporting** — Assume the context provided in `.md` specification files is correct and complete; do NOT wander around the remote server executing unnecessary exploration commands (`ls`, `find`, `cat`, etc.). If you encounter an unexpected error or genuine documentation ambiguity, running direct bash commands via `remote_control` to diagnose the server state is permitted as a last resort, but is not recommended. If you must use `remote_control` for diagnosis:
     - **Notify the user immediately** describing the specific error or discrepancy you are encountering.
     - **Post-task reporting**: Upon completing the primary task, once the root cause of the discrepancy is understood, you MUST use `report_issue` to open a GitHub issue detailing the context discrepancy so documentation can be updated for future agents.
-12. **Layout XL connectivity binding** — Do not edit layouts as disjoint polygons. Bind layout views to the source schematic via `lxSetConnRef` and verify zero mismatches with `lxCheckAgainstSource`. During Generate From Source (GFS), retarget pins to Metal 1 (`"M1" "pin"`, $0.2\,\mu\text{m} \times 0.2\,\mu\text{m}$) using `lxSetNetPinSpecs` and generate centered pin labels.
-13. **Calibre layer mapping & SVRF deck** — Never stream out GDSII without `-layerMap`. Do not redefine `DRC RESULTS DATABASE` or `DRC SUMMARY REPORT` in `drc.svrf`; the foundry deck already defines them.
+12. **Layout XL connectivity binding & DRC rules** — Do not edit layouts as disjoint polygons. Bind layout views to the source schematic via `lxSetConnRef` and verify zero mismatches with `lxCheckAgainstSource`. During Generate From Source (GFS), query terminals dynamically, retarget pins to Metal 1 (`"M1" "pin"`, $0.2\,\mu\text{m} \times 0.2\,\mu\text{m}$) using `lxSetNetPinSpecs`, and create an underlying `("M1" "drawing")` rectangle under every pin bound to the net (`M1.PIN.CAD.1`). Enclose tap vias in continuous straps to satisfy minimum active/implant area rules (`OD.A.1`, `NP.A.1`), instantiate dual taps (`LUP.D.1_LUP.D.2`), and snap geometry to the $0.005\,\mu\text{m}$ grid (`GEN.4`).
+13. **Calibre layer mapping & SVRF deck** — Never stream out GDSII without `-layerMap` and `-case Preserve`. Do not redefine `DRC RESULTS DATABASE` or `DRC SUMMARY REPORT` in `drc.svrf`; the foundry deck already defines them. Always divide Calibre results database coordinates by 1000.0 before passing to Virtuoso SKILL functions.
 
 ## Context routing
 
