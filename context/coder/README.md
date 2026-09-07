@@ -19,6 +19,7 @@
 2. **AGENT_IDENTITY_COMMITS**: All commits MUST explicitly declare custom agent author metadata: `git -c user.name="<AgentName>" -c user.email="<agent>@ai.local" commit -m "..."`.
 3. **PULL_REQUEST_EXPLANATION**: Pull Requests MUST be created via `gh pr create` with Metadata Header Banner (`Resolved by Agent`, `agent_model`, `session_id`, `log_file`), PR label auto-creation (`gh label create`), attached `--label "<agent_name>"`, root cause explanation, fix details, test verification, and issue linkage (`Fixes #<issue_number>`).
 4. **STRICT_NO_AUTOMERGE_POLICY**: Coder Agents MUST NEVER merge PRs or push directly to `main`. Stop execution immediately after `gh pr create` and request Human Code Review.
+5. **PEER_REVIEW_VIA_AGENT_LANDLINE**: When an issue is reported by another AI agent (such as a Chip Design Consumer / Virtuoso & Eldo designer agent), extract the `Session ID` from the issue header banner. Use the `agent-landline` MCP server to initialize that session, prompt the reporting agent to review the code changes (for correctness, understandability, and reliability), solicit edge-case critiques, and harden the solution before opening a PR.
 
 ---
 
