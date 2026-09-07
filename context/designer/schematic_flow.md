@@ -54,3 +54,10 @@ Choose the smallest circuit and simulation set that can answer the user’s ques
 ## 5. Simulate when it answers the objective
 
 Use the documented structural-netlist workflow in [`eldo_simulation_guide.md`](eldo_simulation_guide.md). Simulation is appropriate when it is requested or needed to validate a design target; ask before running only when the user has reserved that decision or the stimulus/corner criteria are material and unspecified.
+
+## 6. Layout and Physical Verification Handoff
+
+Once the schematic is checked clean `(0 0)` and verified with netlisting/simulation:
+- Transition to physical layout generation using Cadence Layout XL: see [`layout_xl_flow.md`](layout_xl_flow.md).
+- Validate physical design rules and tape-out readiness using Calibre DRC: see [`calibre_drc_flow.md`](calibre_drc_flow.md).
+
