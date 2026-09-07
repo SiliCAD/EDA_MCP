@@ -132,14 +132,14 @@ let((win layCv pts m1 x_um y_um)
 Calibre DRC outputs are large (`drc_summary` ~150 KB, `drc_results.db` ~650 KB) and contain Latin-1 characters (e.g., `0xb5` for $\mu\text{m}$), which truncate or error when reading through raw SSH streams.
 
 ### WorkBoard Verification Workflow:
-1. **Initialize WorkBoard**:
+1. **Initialize WorkBoard (if not initalized till now)**:
    ```json
-   { "action": "initialize", "workboard_name": "<cell>_drc" }
+   { "action": "initialize", "workboard_name": "<workbord_name>" }
    ```
 2. **Fetch Verification Artifacts**:
    ```json
-   { "action": "add", "remote_path": "~/Desktop/cmos65/drc_run/drc_summary", "local_path": "drc_summary.txt", "workboard_name": "<cell>_drc" }
-   { "action": "add", "remote_path": "~/Desktop/cmos65/drc_run/drc_results.db", "local_path": "drc_results.db", "workboard_name": "<cell>_drc" }
+   { "action": "add", "remote_path": "~/Desktop/cmos65/drc_run/drc_summary", "local_path": "drc_summary.txt", "workboard_name": "<workbord_name>" }
+   { "action": "add", "remote_path": "~/Desktop/cmos65/drc_run/drc_results.db", "local_path": "drc_results.db", "workboard_name": "<workbord_name>" }
    ```
 3. **Local Analysis**:
    Parse exact violation coordinates and rule strings locally using Python or ripgrep without remote latency or pagination limits.
