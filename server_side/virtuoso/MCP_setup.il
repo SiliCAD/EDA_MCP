@@ -12,7 +12,10 @@ procedure( MCP_DataHandler(ipcId data)
                 if( errSuccess then
                     fprintf(p "RESULT: %L\n\n" res)
                 else
-                    fprintf(p "RESULT: ERROR (SKILL evaluation failed)\n\n")
+                    let((errStr)
+                        errStr = if(boundp('hiGetError) && hiGetError() then sprintf(nil "%L" hiGetError()) else "SKILL evaluation failed")
+                        fprintf(p "RESULT: ERROR (%s)\n\n" errStr)
+                    )
                 )
             )
             progn(

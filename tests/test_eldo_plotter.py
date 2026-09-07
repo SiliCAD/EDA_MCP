@@ -26,8 +26,8 @@ class TestEldoPlotter(unittest.TestCase):
         else:
             cls.app = QtWidgets.QApplication.instance()
             
-        cls.raw_path = os.path.join(base_dir, "workboard", "aoi32_sim", "aoi32_formats.raw")
-        cls.spi3_path = os.path.join(base_dir, "workboard", "aoi32_sim", "aoi32_formats.spi3")
+        cls.raw_path = os.path.join(base_dir, "workboard", "inv_sim", "tb_inv_np.spi3")
+        cls.spi3_path = os.path.join(base_dir, "workboard", "inv_sim", "tb_inv_np.spi3")
 
     def test_format_si_unit(self):
         self.assertEqual(format_si_unit(0.0, 'V'), '0.00 V')
@@ -39,24 +39,24 @@ class TestEldoPlotter(unittest.TestCase):
     def test_load_spice_data_raw(self):
         raw, time_axis, trace_names = load_spice_data(self.raw_path)
         self.assertGreater(len(time_axis), 0)
-        self.assertIn('V(Y)', trace_names)
-        self.assertIn('V(A1)', trace_names)
+        self.assertIn('V(OUT)', trace_names)
+        self.assertIn('V(IN)', trace_names)
 
     def test_load_spice_data_spi3(self):
         raw, time_axis, trace_names = load_spice_data(self.spi3_path)
         self.assertGreater(len(time_axis), 0)
-        self.assertIn('V(Y)', trace_names)
-        self.assertIn('V(A1)', trace_names)
+        self.assertIn('V(OUT)', trace_names)
+        self.assertIn('V(IN)', trace_names)
 
     def test_find_trace_name(self):
-        traces = ['time', 'V(Y)', 'V(A1)', 'I(VDD)']
-        self.assertEqual(find_trace_name(traces, 'v(y)'), 'V(Y)')
-        self.assertEqual(find_trace_name(traces, 'V(A1)'), 'V(A1)')
+        traces = ['time', 'V(OUT)', 'V(IN)', 'I(VDD)']
+        self.assertEqual(find_trace_name(traces, 'v(out)'), 'V(OUT)')
+        self.assertEqual(find_trace_name(traces, 'V(IN)'), 'V(IN)')
         self.assertEqual(find_trace_name(traces, 'i(vdd)'), 'I(VDD)')
         self.assertIsNone(find_trace_name(traces, 'V(NONEXISTENT)'))
 
     def test_create_default_layout(self):
-        traces = ['time', 'V(Y)', 'V(A1)', 'I(VDD)']
+        traces = ['time', 'V(OUT)', 'V(IN)', 'I(VDD)']
         layout = create_default_layout(traces)
         self.assertEqual(len(layout), 2)
         self.assertEqual(layout[0]['pane_title'], 'Voltages')
@@ -64,17 +64,17 @@ class TestEldoPlotter(unittest.TestCase):
 
     def test_waveform_visualizer_panes(self):
         layout = [
-            {"pane_title": "Output", "signals": ["V(Y)"]},
-            {"pane_title": "Input", "signals": ["V(A1)"]}
+            {"pane_title": "Output", "signals": ["V(OUT)"]},
+            {"pane_title": "Input", "signals": ["V(IN)"]}
         ]
         viewer = WaveformVisualizer(self.raw_path, layout)
         self.assertEqual(len(viewer.plot_panes), 2)
         self.assertIn(0, viewer.plotted_signals)
-        self.assertEqual(viewer.plotted_signals[0][0][0], "V(Y)")
+        self.assertEqual(viewer.plotted_signals[0][0][0], "V(OUT)")
 
     def test_dynamic_legend_update(self):
         layout = [
-            {"pane_title": "Output", "signals": ["V(Y)"]}
+            {"pane_title": "Output", "signals": ["V(OUT)"]}
         ]
         viewer = WaveformVisualizer(self.raw_path, layout)
         # Simulate mouse movement at x = 0
@@ -85,7 +85,7 @@ class TestEldoPlotter(unittest.TestCase):
         # Check label item text has updated with live value
         label_item = viewer.plotted_signals[0][0][4]
         self.assertIsNotNone(label_item)
-        self.assertIn("V(Y):", label_item.text)
+        self.assertIn("V(OUT):", label_item.text)
 
     def test_visualize_waveforms_action_validation(self):
         # Missing file_path and command

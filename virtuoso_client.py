@@ -242,7 +242,7 @@ class VirtuosoClient:
     def run(self, skill_code: str, work_dir: str = "", timeout: float = 10.0) -> str:
         return self.assisted_run(skill_code=skill_code, work_dir=work_dir, timeout=timeout)
 
-    def run_terminal_command(self, command: str, work_dir: str = "", timeout: float = 60.0) -> str:
+    def run_terminal_command(self, command: str, work_dir: str = "", timeout: float = 60.0, use_bash: bool = True) -> str:
         """
         Executes a terminal/shell command in the dedicated Virtuoso SSH terminal session.
         Shares working directory and persistent shell environment with Virtuoso assisted mode.
@@ -253,7 +253,8 @@ class VirtuosoClient:
             safe_dir = f"$HOME{target_dir[1:]}" if target_dir.startswith("~") else shlex.quote(target_dir)
             self.session.execute_command(f"cd {safe_dir}")
             
-        exit_code, stdout, stderr = self.session.execute_command(command, timeout=timeout)
+        exec_cmd = f"bash -c {shlex.quote(command)}" if (use_bash and not command.strip().startswith("bash")) else command
+        exit_code, stdout, stderr = self.session.execute_command(exec_cmd, timeout=timeout)
         output = []
         output.append(f"[Virtuoso Terminal Command]: {command}")
         output.append(f"Exit Status: {exit_code}")
