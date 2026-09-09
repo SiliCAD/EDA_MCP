@@ -14,6 +14,35 @@
 
 ---
 
+## Repository Architecture (`src/` Modular Layout)
+
+```text
+EDA_MCP/
+├── server.py                   # Backward-compatible entrypoint shim for MCP runners
+├── src/
+│   ├── __init__.py             # Exports IssueReporter
+│   ├── server.py               # FastMCP server definition & tool registration
+│   ├── issue_reporter.py       # Autonomous GitHub issue & smart label reporter
+│   │
+│   ├── core/                   # Infrastructure & Transport Layer
+│   │   ├── __init__.py         # Exports RemoteSession, SCPClient
+│   │   ├── ssh_client.py       # Persistent CSH subshell, sentinels, interactive streams
+│   │   └── scp_client.py       # OpenSSH SCP direct transfer engine
+│   │
+│   └── clients/                # High-Level Domain Tool Clients
+│       ├── __init__.py         # Exports VirtuosoClient, EldoClient, WorkBoardClient
+│       ├── virtuoso_client.py  # Cadence Virtuoso SKILL FIFO / REPL controller
+│       ├── eldo_client.py      # Siemens Eldo simulation engine
+│       ├── eldo_plotter.py     # Waveform viewer / PyQtGraph plotting engine
+│       └── workboard_client.py # Local-remote Git workspace synchronizer
+│
+├── tests/                      # Unit and integration test suites
+├── config/                     # Remote SSH / tool JSON configs
+└── context/                    # Dual-track agent directives (designer & coder)
+```
+
+---
+
 ## Agent Operational Invariants (Suggestion)
 
 1. **AGENT_IDENTITY_BRANCHING**: Every issue fix or enhancement MUST be created on a feature branch named `<agent_name>/issue-<issue_number>-<description>` (e.g., `antigravity/issue-42-eldo-timeout-fix`).

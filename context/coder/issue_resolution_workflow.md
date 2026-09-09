@@ -164,7 +164,7 @@ Fixes #42" \
 
 1. [ ] **Inspect Issue**: Read issue details via `gh issue view <issue_number>`. Check for `Session ID` in issue banner.
 2. [ ] **Create Branch**: Run `git checkout -b <agent_name>/issue-<issue_number>-<description>`.
-3. [ ] **Implement Fix**: Edit source files (`server.py`, `issue_reporter.py`, `*_client.py`, `context/*`).
+3. [ ] **Implement Fix**: Edit source files (`src/server.py`, `src/core/*`, `src/clients/*`, `src/issue_reporter.py`, `context/*`).
 4. [ ] **Verify Tests**: Run `python3 -m unittest discover tests` and ensure 0 failures.
 5. [ ] **Peer Review via agent-landline**: If `Session ID` is present, resume session with `initialize_agent`, request review with `send_prompt`, probe for edge cases, and harden solution.
 6. [ ] **Commit with Identity**: Run `git -c user.name="<AgentName>" -c user.email="<agent>@ai.local" commit -m "..."`.

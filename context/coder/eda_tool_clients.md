@@ -1,6 +1,6 @@
 # EDA_TOOL_CLIENTS_SPEC
 
-## 1. Cadence Virtuoso Client ([`virtuoso_client.py`](../../virtuoso_client.py))
+## 1. Cadence Virtuoso Client ([`virtuoso_client.py`](../../src/clients/virtuoso_client.py))
 
 ### Assisted Run FIFO Pipe IPC State Machine
 ```
@@ -28,7 +28,7 @@
 
 ---
 
-## 2. Siemens Eldo Client ([`eldo_client.py`](../../eldo_client.py))
+## 2. Siemens Eldo Client ([`eldo_client.py`](../../src/clients/eldo_client.py))
 
 ### Interactive REPL Mode (`eldo -inter`)
 - `start_interactive(netlist_file, work_dir)`: Sends `eldo <netlist_file> -inter` via `execute_interactive_stream()` matching `(eldo>\s*$|\bELDO>\s*$)`.
