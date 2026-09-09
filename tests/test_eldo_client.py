@@ -1,6 +1,6 @@
 import unittest
 from unittest.mock import MagicMock
-from eldo_client import EldoClient
+from src.clients.eldo_client import EldoClient
 
 class TestEldoClientRunScript(unittest.TestCase):
     def setUp(self):

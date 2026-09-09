@@ -6,7 +6,7 @@ import logging
 # Ensure project root is in python path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from scp_client import SCPClient
+from src.core.scp_client import SCPClient
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("test_scp_online")

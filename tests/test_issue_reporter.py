@@ -3,7 +3,7 @@ from unittest.mock import patch, MagicMock
 import subprocess
 import json
 import re
-from issue_reporter import IssueReporter
+from src.issue_reporter import IssueReporter
 
 class TestIssueReporter(unittest.TestCase):
 

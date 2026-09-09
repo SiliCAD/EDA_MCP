@@ -1,6 +1,6 @@
 import unittest
 from unittest.mock import MagicMock
-from virtuoso_client import VirtuosoClient
+from src.clients.virtuoso_client import VirtuosoClient
 
 class TestVirtuosoAutoInit(unittest.TestCase):
     def setUp(self):

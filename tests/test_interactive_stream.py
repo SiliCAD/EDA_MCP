@@ -5,7 +5,7 @@ import os
 base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, base_dir)
 
-from ssh_client import RemoteSession
+from src.core.ssh_client import RemoteSession
 
 def main():
     print("==========================================")

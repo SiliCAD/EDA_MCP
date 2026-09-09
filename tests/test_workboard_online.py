@@ -6,7 +6,7 @@ import logging
 # Ensure project root is in python path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from workboard_client import WorkBoardClient
+from src.clients.workboard_client import WorkBoardClient
 
 def run_workboard_online_test():
     print("=" * 70)

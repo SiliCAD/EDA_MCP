@@ -4,12 +4,13 @@
 
 | Component | Source File | Class / Function | Description |
 | :--- | :--- | :--- | :--- |
-| **MCP Entrypoint** | [`server.py`](../../server.py) | `FastMCP("EDA_MCP")` | Registers 4 MCP tools, initializes per-tool SSH sessions, configures logger (`logs/eda_mcp_*.log`). |
-| **SSH Transport** | [`ssh_client.py`](../../ssh_client.py) | `RemoteSession` | Manages persistent `csh` subshell over SSH, sentinel execution (`_read_until_sentinel`), and interactive stream reading (`execute_interactive_stream`). |
-| **SCP Transport** | [`scp_client.py`](../../scp_client.py) | `SCPClient` | Executes OpenSSH `scp -O` for direct binary/folder transfer without shell escaping overhead. |
-| **Virtuoso Interface** | [`virtuoso_client.py`](../../virtuoso_client.py) | `VirtuosoClient` | Manages SKILL FIFO pipe (`MCP.command`) IPC polling (`mcp_output.txt`) and `virtuoso -nograph` REPL streaming. |
-| **Eldo Interface** | [`eldo_client.py`](../../eldo_client.py) | `EldoClient` | Manages `eldo -inter` REPL streaming and `.extract` measurement summary parsing. |
-| **WorkBoard Engine** | [`workboard_client.py`](../../workboard_client.py) | `WorkBoardClient` | Manages `./workboard/<name>/` local Git repositories, `.workboard.json` manifests, SHA-256 checksums, and unified diffs. |
+| **MCP Entrypoint** | [`server.py`](../../src/server.py) | `FastMCP("EDA_MCP")` | Registers 4 MCP tools, initializes per-tool SSH sessions, configures logger (`logs/eda_mcp_*.log`). |
+| **SSH Transport** | [`ssh_client.py`](../../src/core/ssh_client.py) | `RemoteSession` | Manages persistent `csh` subshell over SSH, sentinel execution (`_read_until_sentinel`), and interactive stream reading (`execute_interactive_stream`). |
+| **SCP Transport** | [`scp_client.py`](../../src/core/scp_client.py) | `SCPClient` | Executes OpenSSH `scp -O` for direct binary/folder transfer without shell escaping overhead. |
+| **Virtuoso Interface** | [`virtuoso_client.py`](../../src/clients/virtuoso_client.py) | `VirtuosoClient` | Manages SKILL FIFO pipe (`MCP.command`) IPC polling (`mcp_output.txt`) and `virtuoso -nograph` REPL streaming. |
+| **Eldo Interface** | [`eldo_client.py`](../../src/clients/eldo_client.py) | `EldoClient` | Manages `eldo -inter` REPL streaming and `.extract` measurement summary parsing. |
+| **WorkBoard Engine** | [`workboard_client.py`](../../src/clients/workboard_client.py) | `WorkBoardClient` | Manages `./workboard/<name>/` local Git repositories, `.workboard.json` manifests, SHA-256 checksums, and unified diffs. |
+| **Issue Reporter** | [`issue_reporter.py`](../../src/issue_reporter.py) | `IssueReporter` | Autonomous GitHub issue reporting with smart label normalization, random-color creation, and fallback recovery. |
 
 ---
 

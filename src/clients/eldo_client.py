@@ -1,7 +1,7 @@
 import shlex
 import time
 import logging
-from ssh_client import RemoteSession
+from src.core.ssh_client import RemoteSession
 
 logger = logging.getLogger("eda_mcp.eldo_client")
 

@@ -2,8 +2,8 @@ import unittest
 import os
 import shutil
 import tempfile
-from workboard_client import WorkBoardClient
-from scp_client import SCPClient
+from src.clients.workboard_client import WorkBoardClient
+from src.core.scp_client import SCPClient
 
 class MockSCPClient:
     """Mock SCPClient for offline unit testing."""

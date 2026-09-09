@@ -6,7 +6,7 @@ import subprocess
 import time
 import difflib
 from typing import Dict, Any, Optional, Tuple, List
-from scp_client import SCPClient
+from src.core.scp_client import SCPClient
 
 logger = logging.getLogger("eda_mcp.workboard_client")
 

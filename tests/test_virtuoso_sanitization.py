@@ -1,5 +1,5 @@
 import unittest
-from virtuoso_client import VirtuosoClient
+from src.clients.virtuoso_client import VirtuosoClient
 
 class TestVirtuosoSanitization(unittest.TestCase):
     def setUp(self):

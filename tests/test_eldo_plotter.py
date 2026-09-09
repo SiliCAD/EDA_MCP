@@ -8,14 +8,14 @@ base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if base_dir not in sys.path:
     sys.path.insert(0, base_dir)
 
-from eldo_plotter import (
+from src.clients.eldo_plotter import (
     load_spice_data,
     find_trace_name,
     format_si_unit,
     create_default_layout,
     WaveformVisualizer
 )
-from server import eldo
+from src.server import eldo
 from pyqtgraph.Qt import QtWidgets
 
 class TestEldoPlotter(unittest.TestCase):
