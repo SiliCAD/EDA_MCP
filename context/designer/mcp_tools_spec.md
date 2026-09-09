@@ -129,5 +129,7 @@ type ReportIssueArgs = {
 ### Auto-Behavior
 - **Client Agent Auto-Detection**: Extracts `agent_name` (`Antigravity`, `claude-code`, `cursor`) from MCP `clientInfo` context via FastMCP `Context`.
 - **Log Auto-Attachment**: Automatically references the active server log in `logs/eda_mcp_*.log`.
-- **GitHub Label Auto-Creation**: Checks repository via `gh label list` and creates agent label (`gh label create`) if missing.
+- **Smart Label Matching & Typo Tolerance**: Checks repository labels via `gh label list --limit 500`. Evaluates labels through a 5-tier cascade: exact match, case-insensitivity, delimiter normalization (`_`, `-`, `.`, `/`, whitespace), alphanumeric matching, and fuzzy matching (typo tolerance for e.g. `"enhansement"` -> `"enhancement"`, `"new_lable"` <-> `"new lable"`). Supports comma-separated label strings.
+- **GitHub Label Auto-Creation**: If any requested or agent label does not exist in the repository, automatically creates it via `gh label create` with a randomized 6-character hex color.
+- **Fallback Recovery**: If GitHub CLI rejects label assignment during `gh issue create`, automatically retries without labels so that issue contents and error reports are never lost.
 - **Form Suggestions**: For suggested Markdown body structure on bugs and enhancements, see [`issue_reporting_guide.md`](issue_reporting_guide.md).
