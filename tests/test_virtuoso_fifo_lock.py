@@ -2,7 +2,7 @@ import os
 import tempfile
 import unittest
 from unittest.mock import MagicMock, patch
-from src.clients.virtuoso_client import VirtuosoClient
+from src.clients.virtuoso_client import VirtuosoClient, DEFAULT_LOCK_PATH
 from filelock import FileLock, Timeout
 
 class TestVirtuosoFifoLock(unittest.TestCase):
@@ -20,7 +20,7 @@ class TestVirtuosoFifoLock(unittest.TestCase):
 
     def test_default_lock_path_and_custom_lock_path(self):
         default_client = VirtuosoClient(session=self.mock_session)
-        self.assertEqual(default_client.lock_path, "/tmp/virtuoso_fifo.lock")
+        self.assertEqual(default_client.lock_path, DEFAULT_LOCK_PATH)
         self.assertIsInstance(default_client.fifo_lock, FileLock)
         self.assertEqual(self.client.lock_path, self.lock_path)
 
@@ -38,9 +38,10 @@ class TestVirtuosoFifoLock(unittest.TestCase):
         external_lock = FileLock(self.lock_path)
         with external_lock:
             self.assertTrue(external_lock.is_locked)
-            # assisted_run should raise Timeout when lock cannot be acquired within 0.2s
-            with self.assertRaises(Timeout):
-                self.client.assisted_run("plus(1 1)")
+            # assisted_run should gracefully return diagnostic message when lock cannot be acquired within 0.2s
+            res = self.client.assisted_run("plus(1 1)")
+            self.assertIn("Error: Could not acquire Virtuoso FIFO lock", res)
+            self.assertIn(self.lock_path, res)
 
         # Once external lock is released, assisted_run succeeds
         res = self.client.assisted_run("plus(1 1)")
