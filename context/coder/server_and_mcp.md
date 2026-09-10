@@ -53,3 +53,13 @@ workboard_client = WorkBoardClient()
 | `workboard` | `"diff"` | `workboard_client.diff(local_path, workboard_name)` |
 | `workboard` | `"status"` | `workboard_client.status(workboard_name)` |
 | `workboard` | `"history"` | `workboard_client.history(local_path, workboard_name)` |
+
+---
+
+## 4. Background Daemon Architecture (`daemon.py` & `eda_client.py`)
+
+For multi-agent workflows, automated batch scripts, and external flow libraries that need to access the active Virtuoso GUI and Eldo session without session locking or FIFO collision:
+- **Daemon (`daemon.py`)**: Runs a persistent FastAPI HTTP gateway on `http://127.0.0.1:8765`, exposing `/virtuoso`, `/eldo`, `/workboard`, `/remote_control`, and `/health`.
+- **Client SDK (`src.clients.eda_client.EDADaemonClient`)**: Provides a zero-dependency HTTP client wrapper for scripts to execute high-level operations.
+- **Cross-Process Protection**: All `assisted_run()` calls are automatically synchronized via `FileLock("/tmp/virtuoso_fifo.lock")`.
+

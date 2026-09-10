@@ -2,6 +2,7 @@ import os
 import shlex
 import time
 import logging
+from filelock import FileLock
 from src.core.ssh_client import RemoteSession
 
 logger = logging.getLogger("eda_mcp.virtuoso_client")
@@ -11,12 +12,14 @@ class VirtuosoClient:
     High-level client for managing and executing SKILL commands in Cadence Virtuoso
     over a RemoteSession SSH transport.
     """
-    def __init__(self, session: RemoteSession):
+    def __init__(self, session: RemoteSession, lock_path: str = "/tmp/virtuoso_fifo.lock"):
         self.session = session
         self.pid = None
         self.workdir = None
         self.standalone_active = False
         self.standalone_workdir = None
+        self.lock_path = lock_path
+        self.fifo_lock = FileLock(self.lock_path, timeout=120.0)
 
     def start_standalone(self, work_dir: str = "~/Desktop/cmos65") -> str:
         """
@@ -188,56 +191,58 @@ class VirtuosoClient:
         """
         Executes a SKILL command in Human+AI assisted mode via IPC pipe and polls mcp_output.txt for output.
         Auto-initializes session working directory if not yet initialized.
+        Protected by cross-process FIFO FileLock to prevent race conditions.
         """
-        self.session.connect()
-        target_dir = (work_dir.strip() if work_dir and work_dir.strip() else None) or self.workdir or "~/Desktop/cmos65"
+        with self.fifo_lock:
+            self.session.connect()
+            target_dir = (work_dir.strip() if work_dir and work_dir.strip() else None) or self.workdir or "~/Desktop/cmos65"
 
-        if not self.workdir:
-            logger.info("assisted_run auto-initializing Virtuoso session...")
-            init_res = self._initialize(work_dir=target_dir)
-            if "Failed to initialize" in init_res:
-                return init_res
-        else:
-            safe_dir = f"$HOME{self.workdir[1:]}" if self.workdir.startswith("~") else shlex.quote(self.workdir)
-            self.session.execute_command(f"cd {safe_dir}")
-            
-        clean_skill = self._clean_skill_command(skill_code)
-        if not clean_skill:
-            return "Error: Empty SKILL command after removing comments."
+            if not self.workdir:
+                logger.info("assisted_run auto-initializing Virtuoso session...")
+                init_res = self._initialize(work_dir=target_dir)
+                if "Failed to initialize" in init_res:
+                    return init_res
+            else:
+                safe_dir = f"$HOME{self.workdir[1:]}" if self.workdir.startswith("~") else shlex.quote(self.workdir)
+                self.session.execute_command(f"cd {safe_dir}")
+                
+            clean_skill = self._clean_skill_command(skill_code)
+            if not clean_skill:
+                return "Error: Empty SKILL command after removing comments."
 
-        output_file = "mcp_output.txt"
-        
-        # Clear mcp_output.txt before sending command
-        self.session.execute_command(f"rm -f {output_file} && touch {output_file}")
-        
-        # Write command directly to FIFO pipe MCP.command
-        fifo_write_cmd = f"printf '%s\\n' {shlex.quote(clean_skill)} > MCP.command"
-        exit_code, out, _ = self.session.execute_command(fifo_write_cmd)
-        if exit_code != 0:
-            return f"Failed to send command to Virtuoso FIFO pipe: {out}"
+            output_file = "mcp_output.txt"
             
-        # Polling loop: wait for RESULT: marker in mcp_output.txt
-        start_time = time.time()
-        poll_interval = 0.3
-        
-        while time.time() - start_time < timeout:
+            # Clear mcp_output.txt before sending command
+            self.session.execute_command(f"rm -f {output_file} && touch {output_file}")
+            
+            # Write command directly to FIFO pipe MCP.command
+            fifo_write_cmd = f"printf '%s\\n' {shlex.quote(clean_skill)} > MCP.command"
+            exit_code, out, _ = self.session.execute_command(fifo_write_cmd)
+            if exit_code != 0:
+                return f"Failed to send command to Virtuoso FIFO pipe: {out}"
+                
+            # Polling loop: wait for RESULT: marker in mcp_output.txt
+            start_time = time.time()
+            poll_interval = 0.3
+            
+            while time.time() - start_time < timeout:
+                try:
+                    content = self.session.read_file(output_file)
+                    if content and "RESULT:" in content:
+                        return content
+                except Exception:
+                    pass
+                time.sleep(poll_interval)
+                
+            # If timeout reached, return whatever is in mcp_output.txt or a diagnostic timeout notice
             try:
-                content = self.session.read_file(output_file)
-                if content and "RESULT:" in content:
-                    return content
+                current_content = self.session.read_file(output_file)
+                if current_content.strip():
+                    return f"[Timeout Warning: RESULT marker not detected within {timeout}s]\nPartial Output:\n{current_content}\n\nNote: Cadence Virtuoso may be blocked by a modal UI dialog (e.g. geOpen prompt, unlinked master confirmation, schCheck dialog, or save prompt). Please check the Virtuoso GUI or increase the 'timeout' parameter."
             except Exception:
                 pass
-            time.sleep(poll_interval)
-            
-        # If timeout reached, return whatever is in mcp_output.txt or a diagnostic timeout notice
-        try:
-            current_content = self.session.read_file(output_file)
-            if current_content.strip():
-                return f"[Timeout Warning: RESULT marker not detected within {timeout}s]\nPartial Output:\n{current_content}\n\nNote: Cadence Virtuoso may be blocked by a modal UI dialog (e.g. geOpen prompt, unlinked master confirmation, schCheck dialog, or save prompt). Please check the Virtuoso GUI or increase the 'timeout' parameter."
-        except Exception:
-            pass
-            
-        return f"Execution timed out ({timeout}s). No response received from Virtuoso in {output_file}.\nPossible causes:\n1. Virtuoso GUI is waiting for user interaction on a modal dialog (e.g., geOpen, schCheck unlinked master prompt, file overwrite prompt).\n2. The SKILL script contains a long-running execution (e.g., system(...) shell call, netlist check, heavy simulation setup).\nRemedies: Pass a larger 'timeout' parameter or interact with/close the modal dialog in the Virtuoso GUI on the remote server."
+                
+            return f"Execution timed out ({timeout}s). No response received from Virtuoso in {output_file}.\nPossible causes:\n1. Virtuoso GUI is waiting for user interaction on a modal dialog (e.g., geOpen, schCheck unlinked master prompt, file overwrite prompt).\n2. The SKILL script contains a long-running execution (e.g., system(...) shell call, netlist check, heavy simulation setup).\nRemedies: Pass a larger 'timeout' parameter or interact with/close the modal dialog in the Virtuoso GUI on the remote server."
 
     def run(self, skill_code: str, work_dir: str = "", timeout: float = 10.0) -> str:
         return self.assisted_run(skill_code=skill_code, work_dir=work_dir, timeout=timeout)
