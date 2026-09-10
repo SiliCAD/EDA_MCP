@@ -19,6 +19,7 @@
    Polling Loop (Interval: 0.3s, Timeout: 30.0s)
    read_file("mcp_output.txt") until "RESULT:" appears
 > **Command Length & Error Handling Contract**: `assisted_run` SKILL commands are written directly to `MCP.command` FIFO via shell `echo` (keep short/concise; use `load("file.il")` for large scripts). Server-side [`MCP_setup.il`](../../server_side/virtuoso/MCP_setup.il) wraps `evalstring` in `errset` and `unwindProtect` to catch SKILL exceptions, write `RESULT: ERROR ...`, and restore ports without timing out.
+> **Cross-Process Concurrency Protection**: `assisted_run` acquires an OS-level `FileLock` (defaulting to `os.path.join(tempfile.gettempdir(), "virtuoso_fifo.lock")`) to prevent race conditions or pipe corruption when multiple external automation scripts, daemon requests, or agent instances invoke SKILL commands simultaneously. If lock acquisition exceeds timeout, it safely aborts and returns a diagnostic message without crashing.
 
 
 ### Standalone REPL Mode
