@@ -36,14 +36,8 @@ TASK INTENT CLASSIFICATION                  MANDATORY SPECIFICATION TO READ (vie
 **Trigger Intent:** User requests schematic creation, simulation, sizing, layout, or EDA tool execution.
 
 ### Pre-Execution Requirement:
-```json
-{
-  "tool": "view_file",
-  "arguments": {
-    "AbsolutePath": "/Users/vs/function/EDA_MCP/context/designer/README.md"
-  }
-}
-```
+Read the context specification file at this relative path before taking any action:
+`context/designer/README.md`
 
 ### Core Invariants Enforced:
 1. `LIBRARY_SCOPE`: All generated cellviews MUST reside in library `MCP`.
@@ -68,14 +62,8 @@ TASK INTENT CLASSIFICATION                  MANDATORY SPECIFICATION TO READ (vie
 **Trigger Intent:** User requests fixing a bug, resolving a GitHub issue, modifying Python source code, or updating server logic.
 
 ### Pre-Execution Requirement:
-```json
-{
-  "tool": "view_file",
-  "arguments": {
-    "AbsolutePath": "/Users/vs/function/EDA_MCP/context/coder/README.md"
-  }
-}
-```
+Read the context specification file at this relative path before taking any action:
+`context/coder/README.md`
 
 ### Core Invariants Enforced:
 1. `BRANCH_NAMING`: Create feature branch: `<agent_name>/issue-<issue_number>-<description>`.
