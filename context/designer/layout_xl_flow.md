@@ -19,7 +19,9 @@ This guide establishes the operational specification for generating, placing, ro
 
 ## 2. How to Launch Cadence Layout XL
 
-Standard `geOpen(?lib ... ?cell ... ?view "layout" ?viewType "maskLayout")` opens basic **Layout L**, operating without connectivity binding or schematic cross-probing.
+> [!IMPORTANT]
+> **Layout XL Requires `assisted_run` (Graphic Window Tier)**:
+> Cadence Layout XL, GFS (`lxGenerateStart`/`Finish`), auto-placement (`nclAnalogQuickPlaceLikeSchemCB`), and VSR routing (`_iaAutomaticExecuteCmd`) strictly require the graphic editor window tier (`deOpen` returns a graphic window ID). In `virtuoso:standalone` (`virtuoso -nograph`), graphic windows do not exist (`GE-2067`) and GFS generates 0 instances. Always execute Layout XL via `virtuoso(action="assisted_run")`, which runs completely headlessly and autonomously inside the remote server's active Xvnc GUI session without any human intervention.
 
 To open in **Layout XL (VXL)** with active schematic correspondence:
 
