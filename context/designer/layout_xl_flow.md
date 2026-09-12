@@ -28,9 +28,10 @@ Layout operations can be executed via two distinct paths depending on whether in
 | **OpenAccess Database (`dbCreate*`)** | **YES** | **YES** | Direct polygon, instance, via, and net creation. |
 | **CDF Initialization (`initMosTransistor`)** | **YES** | **YES** | Runs CDF callbacks on layout instances. |
 | **Connectivity Binding (`lxSetConnRef`)** | **YES** | **YES** | Sets cellview database reference to source schematic. |
+| **Batch GFS (`lxGenFromSource`)** | **YES** | **YES** | Official headless batch generator. Instantiates devices, pins, PR boundary, and binds connectivity without GUI windows. |
 | **LVS Verification (`lxCheckAgainstSource`)** | **YES** | **YES** | Verifies database connectivity and parameter equivalence without GUI windows. |
 | **Window Launch (`deOpen`)** | NO | **YES** | Returns window ID; requires graphic window tier. |
-| **GFS (`lxGenerateStart` / `Finish`)** | NO | **YES** | Generates 0 instances without a graphic window. |
+| **Interactive GFS (`lxGenerateStart` / `Finish`)** | NO | **YES** | GUI dialog-bound generator; requires active graphic window. |
 | **Analog Placer (`nclAnalogQuickPlace*`)** | NO | **YES** | Requires active graphic editor window context. |
 | **VSR Router (`_iaAutomaticExecuteCmd`)** | NO | **YES** | Space-based router operates on active window view. |
 
@@ -94,29 +95,26 @@ dbClose(schCV)
 
 ## 3. How to Generate From Source (GFS)
 
-Layout XL provides a programmatic generation lifecycle API. Always load the schematic view robustly and query its terminals dynamically:
+### 3.1 Primary Headless Batch Flow: `lxGenFromSource` (Standalone `-nograph`)
+
+`lxGenFromSource` is Cadence's official, dedicated batch Layout XL generation function. It operates directly on database cellview pointers **without requiring an open graphics window or `deOpen`**:
 
 ```lisp
-;; 1. Safely open schematic database pointer (avoids dbFindOpenCellView returning nil)
+;; 1. Safely open schematic database pointer
 schCV = dbOpenCellViewByType("MCP" "<cell>" "schematic" "schematic" "r")
-layCV = geGetWindowCellView(hiGetCurrentWindow())
 
-;; 2. Dynamically extract all interface pin nets (generalizes to any cell topology)
-schNets = schCV~>terminals~>name
+;; 2. Execute headless batch Generation From Source
+;; Automatically creates layout view, PR boundary, instantiates pcells, and generates pins
+layCV = lxGenFromSource(schCV
+  ?layViewName "layout"
+  ?initCreateInstances t
+  ?initCreatePins t
+  ?initCreateBoundary t
+)
 
-;; 3. Start generation session
-lxGenerateStart(schCV layCV)
-
-;; 4. Retarget pins to Metal 1 (M1) with valid dimensions (0.2um x 0.2um)
-;; Prevents default 60nm unlabelled PO pins which fail pin CAD enclosure checks
-lxSetNetPinSpecs(?nets schNets ?lpp '("M1" "pin") ?width 0.2 ?height 0.2)
-
-;; 5. Finish generation
-lxGenerateFinish(schCV layCV)
-
-;; 6. Mandatory post-GFS fix for M1.PIN.CAD.1 compliance:
-;; lxSetNetPinSpecs creates shapes on ("M1" "pin"). Foundry rule M1.PIN.CAD.1 strictly
-;; requires an underlying ("M1" "drawing") rectangle of equal/larger size bound to the net:
+;; 3. Mandatory post-GFS fix for M1.PIN.CAD.1 compliance:
+;; Foundry rule M1.PIN.CAD.1 strictly requires an underlying ("M1" "drawing") rectangle
+;; of equal/larger size bound to the net under each pin figure:
 foreach(term layCV~>terminals
   foreach(pin term~>pins
     let((fig rect)
@@ -129,9 +127,51 @@ foreach(term layCV~>terminals
   )
 )
 
-;; 7. Create visible text labels centered on each pin figure
+;; 4. Create visible text labels centered on each pin figure
 procedure(createPinLabel(layCV netName pt)
   dbCreateLabel(layCV list("M1" "pin") pt netName "centerCenter" "R0" "roman" 0.05)
+)
+
+;; 5. Save generated cellview
+dbSave(layCV)
+dbClose(layCV)
+dbClose(schCV)
+```
+
+---
+
+### 3.2 Alternative Interactive GUI Window Flow: `lxGenerateStart` / `lxGenerateFinish` (`assisted_run`)
+
+Use this alternative only when operating within an active graphic editor window (`win = deOpen(...)`) via `virtuoso(action="assisted_run")`:
+
+```lisp
+;; 1. Safely open schematic database pointer and get active window cellview
+schCV = dbOpenCellViewByType("MCP" "<cell>" "schematic" "schematic" "r")
+layCV = geGetWindowCellView(hiGetCurrentWindow())
+
+;; 2. Dynamically extract all interface pin nets
+schNets = schCV~>terminals~>name
+
+;; 3. Start interactive generation session
+lxGenerateStart(schCV layCV)
+
+;; 4. Retarget pins to Metal 1 (M1) with valid dimensions (0.2um x 0.2um)
+lxSetNetPinSpecs(?nets schNets ?lpp '("M1" "pin") ?width 0.2 ?height 0.2)
+
+;; 5. Finish generation
+lxGenerateFinish(schCV layCV)
+
+;; 6. Mandatory post-GFS fix for M1.PIN.CAD.1 compliance:
+foreach(term layCV~>terminals
+  foreach(pin term~>pins
+    let((fig rect)
+      fig = pin~>fig
+      when(fig
+        rect = dbCreateRect(layCV list("M1" "drawing") fig~>bBox)
+        dbAddFigToNet(rect term~>net)
+      )
+    )
+  )
 )
 ```
 
