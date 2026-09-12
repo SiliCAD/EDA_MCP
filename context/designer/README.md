@@ -15,7 +15,9 @@ Apply these defaults before consulting the detailed guides:
 7. Build `tb_<cell>.cir` in WorkBoard (use `write_to_file` without `ArtifactMetadata` for workspace files, or write `.txt` and `mv` to `.cir`), include process corner, and run Eldo from testbench—not raw `.net`.
 8. Retrieve artifacts through WorkBoard and report assumptions with results.
 9. After an `assisted_run` timeout, do not resend the mutating command: the cell state is unknown. Recover, inspect, and continue from observed state.
-10. For layout creation, never use plain `geOpen` (Layout L). Bind connectivity reference to schematic (`lxSetConnRef`) and open in `"Layout XL"` application tier (`win = deOpen(...)`, then extract `layCV = geGetWindowCellView(win)` and `hiSetCurrentWindow(win)`).
+10. For layout creation, never use plain `geOpen` (Layout L). Bind connectivity reference to schematic (`lxSetConnRef`) and select the appropriate execution path:
+    - **Assisted GUI Tier (`assisted_run`)**: For interactive tools requiring a graphic window context (`deOpen` in `"Layout XL"`, GFS `lxGenerateStart`/`Finish`, `nclAnalogQuickPlaceLikeSchemCB`, and VSR router `_iaAutomaticExecuteCmd`). Runs headlessly on the server's active Xvnc GUI session.
+    - **Pure Programmatic OpenAccess (`standalone` / `-nograph`)**: Direct database layout construction (`dbCreateInstByMasterName`, `dbCreateConnByName`, `dbCreateVia`, `dbCreateRect`, `initMosTransistor`). Binding connectivity via `lxSetConnRef` and verifying LVS equivalence via `lxCheckAgainstSource(schCV layCV)` are fully supported in standalone without any GUI window.
 11. In Calibre DRC stream-out (`strmout`), always pass the official PDK layer map (`DK_cmos065lpgp_.../cmos065.layermap`) and `-case Preserve` to avoid the `R_forbidden.1` trap (Layer 15 vs 31). In headless batch decks, unselect density checks (`DRC UNSELECT CHECK ALL_DENSITY_CHECK`) for isolated leaf cells.
 
 ## Authority, scope, and judgment

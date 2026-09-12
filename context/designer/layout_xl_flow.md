@@ -17,13 +17,30 @@ This guide establishes the operational specification for generating, placing, ro
 
 ---
 
-## 2. How to Launch Cadence Layout XL
+## 2. Layout Execution Paths & Engine Compatibility
 
-> [!IMPORTANT]
-> **Layout XL Requires `assisted_run` (Graphic Window Tier)**:
-> Cadence Layout XL, GFS (`lxGenerateStart`/`Finish`), auto-placement (`nclAnalogQuickPlaceLikeSchemCB`), and VSR routing (`_iaAutomaticExecuteCmd`) strictly require the graphic editor window tier (`deOpen` returns a graphic window ID). In `virtuoso:standalone` (`virtuoso -nograph`), graphic windows do not exist (`GE-2067`) and GFS generates 0 instances. Always execute Layout XL via `virtuoso(action="assisted_run")`, which runs completely headlessly and autonomously inside the remote server's active Xvnc GUI session without any human intervention.
+Layout operations can be executed via two distinct paths depending on whether interactive GUI engines (GFS, auto-placer, VSR router) or programmatic database construction are used:
 
-To open in **Layout XL (VXL)** with active schematic correspondence:
+### Engine Compatibility Matrix
+
+| Operation / Engine | Standalone (`-nograph`) | Assisted Run (`assisted_run`) | Notes |
+| :--- | :---: | :---: | :--- |
+| **OpenAccess Database (`dbCreate*`)** | **YES** | **YES** | Direct polygon, instance, via, and net creation. |
+| **CDF Initialization (`initMosTransistor`)** | **YES** | **YES** | Runs CDF callbacks on layout instances. |
+| **Connectivity Binding (`lxSetConnRef`)** | **YES** | **YES** | Sets cellview database reference to source schematic. |
+| **LVS Verification (`lxCheckAgainstSource`)** | **YES** | **YES** | Verifies database connectivity and parameter equivalence without GUI windows. |
+| **Window Launch (`deOpen`)** | NO | **YES** | Returns window ID; requires graphic window tier. |
+| **GFS (`lxGenerateStart` / `Finish`)** | NO | **YES** | Generates 0 instances without a graphic window. |
+| **Analog Placer (`nclAnalogQuickPlace*`)** | NO | **YES** | Requires active graphic editor window context. |
+| **VSR Router (`_iaAutomaticExecuteCmd`)** | NO | **YES** | Space-based router operates on active window view. |
+
+---
+
+### Path A: Assisted GUI Tier (`assisted_run` - Full Layout XL Suite)
+
+Use this path when leveraging Cadence GFS, native placement, or VSR auto-routing:
+- Commands are dispatched to the server's active Xvnc GUI session (`virtuoso(action="assisted_run")`).
+- Executes **100% headlessly without human intervention**.
 
 ```lisp
 ;; 1. Ensure empty layout cellview exists in database
@@ -41,10 +58,36 @@ layCV = geGetWindowCellView(win)
 hiSetCurrentWindow(win)
 ```
 
-### Verification
-Run `lxGetConnRef(layCV)` on the open layout view. It must return:
+---
+
+### Path B: Pure Programmatic OpenAccess Flow (`standalone` / `-nograph`)
+
+Use this path when generating layouts purely through headless batch scripts or algorithms without GFS:
+- Operates entirely within `virtuoso:standalone` (`virtuoso -nograph`).
+- Fully supports instance placement (`dbCreateInstByMasterName`), wiring/shapes (`dbCreateRect`, `dbCreateVia`), and connectivity binding (`dbCreateNet`, `dbCreateConnByName`).
+- LVS validation runs natively in standalone via `lxCheckAgainstSource(schCV layCV)`.
+
 ```lisp
-("CELLVIEW" "MCP" "<cell>" "schematic" "")
+;; 1. Open schematic (read) and layout (append) cellviews
+schCV = dbOpenCellViewByType("MCP" "<cell>" "schematic" "schematic" "r")
+layCV = dbOpenCellViewByType("MCP" "<cell>" "layout" "maskLayout" "a")
+
+;; 2. Bind XL database connectivity reference
+lxSetConnRef("MCP" "<cell>" "layout" "CELLVIEW" ?schLib "MCP" ?schCell "<cell>" ?schView "schematic")
+
+;; 3. Instantiate devices, pins, and nets programmatically
+p = dbCreateInstByMasterName(layCV "cmos065" "psvtgp" "layout" "MP1" list(x_p y_p) "R0")
+n = dbCreateInstByMasterName(layCV "cmos065" "nsvtgp" "layout" "MN1" list(x_n y_n) "R0")
+initMosTransistor(p "2.0" "0.065")
+initMosTransistor(n "1.0" "0.065")
+
+;; 4. Verify equivalence directly in standalone
+lxCheckAgainstSource(schCV layCV)
+
+;; 5. Save and close
+dbSave(layCV)
+dbClose(layCV)
+dbClose(schCV)
 ```
 
 ---
