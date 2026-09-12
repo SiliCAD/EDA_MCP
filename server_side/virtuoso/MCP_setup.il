@@ -71,19 +71,4 @@ initPdkLibrary("cmos065")
 if( boundp('MCP) && ipcIsAliveProcess(MCP) ipcKillProcess(MCP) )
 MCP = ipcBeginProcess("python -u MCP_sockit.py" "" "MCP_DataHandler")
 
-;; Autonomous auto-dismissal for modal dialogs and license/startup prompts
-procedure( MCP_AutoDismissDialogs()
-    let((dialogs)
-        dialogs = list('deDBox 'simSaveAllForm 'simNetNoOp6)
-        foreach(d dialogs
-            when(boundp(d) && eval(d)
-                errset(hiDBoxOK(eval(d)))
-                errset(hiFormDone(eval(d)))
-            )
-        )
-        hiRegTimer("MCP_AutoDismissDialogs()" 3)
-    )
-)
-hiRegTimer("MCP_AutoDismissDialogs()" 1)
-
 
