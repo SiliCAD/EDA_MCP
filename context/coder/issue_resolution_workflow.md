@@ -130,11 +130,19 @@ When collaborating with another coding or designer agent (via a meta-harness, `a
    - `## How We Are Solving It (Technical Solution)`: Clear technical breakdown of the changes, architectural decisions, and files modified.
    - `## Verification & Proof`: Concrete evidence and exact commands used to verify the solution (unit tests passing, simulation logs, DRC/LVS clean reports, POC cellviews).
    - `## Other Useful Information`: Key discoveries, operational rules, PDK/tool quirks, environment traps, or summary table of modified files.
+6. **Cohesive PR Scoping Policy (Avoid Low-Scoped PRs)**:
+   - Pull Requests must **not be artificially low-scoped** (e.g. splitting closely related bugfixes, client adjustments, and documentation into multiple disjoint micro-PRs).
+   - A PR can and should contain a complete set of related fixes and enhancements if they pertain to the same functional milestone, feature request, or interconnected bug set.
+   - Bundle the backend code changes, client fixes, unit tests, and operational documentation together so the human reviewer can inspect and verify the entire holistic feature set in one review cycle.
 
 ---
 
-### 6. 📝 PULL REQUEST EXPLANATION & ISSUE LINKING
+### 6. 📝 PULL REQUEST EXPLANATION & SCOPING POLICY
 - The agent MUST open a Pull Request using `gh pr create`.
+- **PR Scoping Directive (Avoid Low-Scoped PRs)**:
+  - Do NOT fragment work into artificially low-scoped PRs (such as separate PRs for individual files or micro-tweaks).
+  - A PR can contain a set of fixes together if the fixes are related to each other, to the same subsystem, or to a shared multi-agent milestone.
+  - Bundling related fixes ensures complete testability, avoids broken intermediate states on `main`, and provides human maintainers with rich end-to-end context.
 - **Single-Agent Issue PR Banner**: For PRs resolving standalone GitHub issues, begin with the standard agent metadata banner:
   ```markdown
   > **Resolved by Agent:** `<agent_name>` (`<agent_model>`) (Coder / Maintainer)
@@ -211,5 +219,5 @@ Layout XL previously assumed an active GUI session (assisted_run). Autonomous wo
 5. [ ] **Collaborator Satisfaction**: Ensure the collaborating agent has reviewed and confirmed complete satisfaction.
 6. [ ] **Reload MCP Server (if backend changed)**: Follow [`mcp_reload_guide.md`](mcp_reload_guide.md) to restart the server and run sanity checks.
 7. [ ] **Push Branch**: Run `git push origin <agent_name>/<task-description>`.
-8. [ ] **Open Pull Request**: Run `gh pr create` with dual-session header, Motivation/Problem, Solution, Verification, and Other Useful Info.
+8. [ ] **Open Pull Request**: Group related fixes and context updates together (avoid low-scoped PRs). Run `gh pr create` with dual-session header, Motivation/Problem, Solution, Verification, and Other Useful Info.
 9. [ ] **Stop & Request Human Review**: Stop execution and inform the human reviewer. Never auto-merge.
