@@ -19,7 +19,7 @@ This guide establishes the operational specification for generating, placing, ro
 
 ## 2. Layout Execution Paths & Engine Compatibility
 
-Layout operations can be executed via two distinct paths depending on whether interactive GUI engines (GFS, auto-placer, VSR router) or programmatic database construction are used:
+Layout operations can be executed either in headless batch mode (`virtuoso -nograph`) using `lxGenFromSource` or in the GUI tier (`assisted_run`) via `deOpen`:
 
 ### Engine Compatibility Matrix
 
@@ -37,9 +37,9 @@ Layout operations can be executed via two distinct paths depending on whether in
 
 ---
 
-### Path A: Assisted GUI Tier (`assisted_run` - Full Layout XL Suite)
+### GUI Tier Launch (`assisted_run` - Full Layout XL Suite)
 
-Use this path when leveraging Cadence GFS, native placement, or VSR auto-routing:
+Use this path when leveraging Cadence interactive tools, native placement, or VSR auto-routing:
 - Commands are dispatched to the server's active Xvnc GUI session (`virtuoso(action="assisted_run")`).
 - Executes **100% headlessly without human intervention**.
 
@@ -61,37 +61,6 @@ hiSetCurrentWindow(win)
 
 ---
 
-### Path B: Pure Programmatic OpenAccess Flow (`standalone` / `-nograph`)
-
-Use this path when generating layouts purely through headless batch scripts or algorithms without GFS:
-- Operates entirely within `virtuoso:standalone` (`virtuoso -nograph`).
-- Fully supports instance placement (`dbCreateInstByMasterName`), wiring/shapes (`dbCreateRect`, `dbCreateVia`), and connectivity binding (`dbCreateNet`, `dbCreateConnByName`).
-- LVS validation runs natively in standalone via `lxCheckAgainstSource(schCV layCV)`.
-
-```lisp
-;; 1. Open schematic (read) and layout (append) cellviews
-schCV = dbOpenCellViewByType("MCP" "<cell>" "schematic" "schematic" "r")
-layCV = dbOpenCellViewByType("MCP" "<cell>" "layout" "maskLayout" "a")
-
-;; 2. Bind XL database connectivity reference
-lxSetConnRef("MCP" "<cell>" "layout" "CELLVIEW" ?schLib "MCP" ?schCell "<cell>" ?schView "schematic")
-
-;; 3. Instantiate devices, pins, and nets programmatically
-p = dbCreateInstByMasterName(layCV "cmos065" "psvtgp" "layout" "MP1" list(x_p y_p) "R0")
-n = dbCreateInstByMasterName(layCV "cmos065" "nsvtgp" "layout" "MN1" list(x_n y_n) "R0")
-initMosTransistor(p "2.0" "0.065")
-initMosTransistor(n "1.0" "0.065")
-
-;; 4. Verify equivalence directly in standalone
-lxCheckAgainstSource(schCV layCV)
-
-;; 5. Save and close
-dbSave(layCV)
-dbClose(layCV)
-dbClose(schCV)
-```
-
----
 
 ## 3. How to Generate From Source (GFS)
 
