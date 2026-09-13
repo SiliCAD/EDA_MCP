@@ -27,6 +27,7 @@ Apply these defaults before consulting the detailed guides:
     - **In `standalone` (Headless `-nograph`)**: Use Cadence's dedicated batch function `lxGenFromSource(schCV ?layViewName "layout" ?initCreateInstances t ?initCreatePins t ?initCreateBoundary t)`. Binding connectivity (`lxSetConnRef`) and verifying equivalence (`lxCheckAgainstSource`) are fully supported without any GUI window.
     - If stuck in standalone mode, ping the user rather than arbitrarily switching to `assisted_run`.
 11. In Calibre DRC stream-out (`strmout`), always pass the official PDK layer map (`DK_cmos065lpgp_.../cmos065.layermap`) and `-case Preserve` to avoid the `R_forbidden.1` trap (Layer 15 vs 31). In headless batch decks, unselect density checks (`DRC UNSELECT CHECK ALL_DENSITY_CHECK`) for isolated leaf cells.
+12. When collaborating with the Coder Agent on tool enhancements, bugfixes, or documentation (via meta-harness or `agent-landline`), provide your active `Session ID` (`agy --conversation=<id>`) upon request so it can be cited in the PR metadata banner. Review proposed changes on the designated feature branch or nested PR stack.
 
 ## Authority, scope, and judgment
 

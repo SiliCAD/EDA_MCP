@@ -152,8 +152,30 @@ When collaborating with another coding or designer agent (via a meta-harness, `a
      > ...
      "
      ```
-   - **Maintain Clean Separation**: The nested PR displays only the new delta on top of the parent branch, keeping review scopes cleanly separated.
-   - **Retargeting upon Parent Merge**: Once the human maintainer merges the parent PR to `main`, GitHub automatically updates or prompts retargeting the nested PR to `main` (`gh pr edit <pr_number> --base main`).
+   - **Visual PR Stack Navigation**: In every nested PR, include a visual tree linking parent and child PRs so human reviewers can navigate the stack effortlessly:
+     ```markdown
+     ### 🥞 PR Stack Navigation
+     - ➔ **#<current_pr> (This PR)**: `<title>` (Base: `<parent_branch>`)
+       - ↳ [#<parent_pr>](<parent_url>): `<parent_title>` (Base: `main`)
+     ```
+   - **Sync & Rebase Policy for Stacked Branches**:
+     If the human reviewer requests revisions on the parent PR, update the parent branch first, then rebase the stacked branch:
+     ```bash
+     git checkout <nested_branch>
+     git rebase <parent_branch>
+     git push --force-with-lease origin <nested_branch>
+     ```
+     *(Note: `--force-with-lease` is strictly allowed only on isolated feature branches; NEVER force push to `main`.)*
+   - **Post-Merge Retargeting Protocol**:
+     Once the human maintainer merges the parent PR to `main`, retarget the nested PR cleanly with a single command:
+     ```bash
+     # Retarget PR base on GitHub
+     gh pr edit <nested_pr_number> --base main
+     # Sync local branch with upstream main
+     git checkout <nested_branch>
+     git pull origin main --rebase
+     git push --force-with-lease origin <nested_branch>
+     ```
 
 ---
 
