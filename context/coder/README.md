@@ -54,7 +54,7 @@ EDA_MCP/
 6. **CROSS_AGENT_COLLABORATION_WORKFLOW**: When collaborating with another agent (e.g., a Chip Design Agent or another Coder Agent communicating changes/feature requests):
    - **Dedicated Branch**: Always implement requested changes on a separate dedicated branch.
    - **Incremental Atomic Commits**: Commit each change as you are doing it with clear semantic messages and agent author identity.
-   - **Collaborator Satisfaction**: Continue iterating until the collaborating agent confirms full satisfaction with the implementation and tests.
+   - **Collaborator Satisfaction & Session ID Inquiry**: Once a well-scoped task is completed, ask the collaborating / Designer Agent for its active `Session ID` (if not already known) to ensure the PR metadata banner is accurate. Confirm that the collaborating agent is fully satisfied before opening the PR.
    - **Cohesive Scope**: Do not create artificially low-scoped PRs. Group the full set of related fixes, architectural improvements, and context updates together in one cohesive PR.
    - **PR Metadata Header with Both Session IDs**: Open a comprehensive PR whose description begins with a metadata header containing both your Coder Agent session ID (`agy --conversation=<coder_session_id>`) and the collaborating/Designer Agent session ID (`agy --conversation=<designer_session_id>`).
    - **Required PR Description Sections**:
@@ -63,6 +63,11 @@ EDA_MCP/
      - **Verification**: Exact steps and evidence of verification (unit tests, simulation logs, DRC/LVS results).
      - **Other Useful Information**: Discoveries, operational caveats, constraints, and summary of changes.
    - **Human Review Gate**: Never merge the PR; notify the human reviewer.
+7. **NESTED_PRS_FOR_CONTINUOUS_DEVELOPMENT**:
+   - Because Coder Agents cannot merge PRs to `main`, an open PR often sits awaiting human review while subsequent tasks need to build on top of those unmerged changes.
+   - **Branching on Previous Feature Branch**: To use the latest code without blocking, create a stacked branch off the active feature branch (`git checkout -b <agent>/<next-feature> <agent>/<parent-feature>`).
+   - **Nested PR Target (`--base <parent_branch>`)**: Create a **nested PR** targeting the parent feature branch instead of `main` (`gh pr create --base <agent>/<parent-feature>`).
+   - **Benefits**: This preserves logical separation of concerns between distinct tasks/fixes while enabling continuous development. Once the human reviewer merges the parent PR to `main`, the nested PR can be seamlessly retargeted or rebased against `main`.
 
 ---
 
