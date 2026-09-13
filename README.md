@@ -130,8 +130,8 @@ Modern Integrated Circuit (IC) design demands high-performance Linux compute clu
 │  │  Git Workspace /   │ │  Cadence Virtuoso  │ │    Siemens Eldo    │ │ Process PDKs │  │
 │  │  WorkBoard Sync    │ │  SKILL IPC FIFO    │ │   SPICE Simulator  │ │  (cmos065)   │  │
 │  ├────────────────────┤ ├────────────────────┤ ├────────────────────┤ └──────────────┘  │
-│  │ Calibre DRC / LVS  │ │ Virtuoso Layout XL │ │ Calibre xRC PEX    │                     │
-│  └────────────────────┘ └────────────────────┘ └────────────────────┘                     │
+│  │ Calibre DRC / LVS  │ │ Virtuoso Layout XL │ │ Calibre xRC PEX    │                   │
+│  └────────────────────┘ └────────────────────┘ └────────────────────┘                   │
 └─────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -151,7 +151,7 @@ Modern Integrated Circuit (IC) design demands high-performance Linux compute clu
                                                                                                       ▼
                                                                                            `eldo -inter` REPL
                                                                                                       │
-[Local Agent] <── FastMCP (`eldo`) <── SSH <── Reads `interactive_out.txt` <── Output Stream <───────┘
+[Local Agent] <── FastMCP (`eldo`) <── SSH <── Reads `interactive_out.txt` <── Output Stream <────────┘
 ```
 
 ---
