@@ -63,3 +63,9 @@ For multi-agent workflows, automated batch scripts, and external flow libraries 
 - **Client SDK (`src.clients.eda_client.EDADaemonClient`)**: Provides a zero-dependency HTTP client wrapper for scripts to execute high-level operations.
 - **Cross-Process Protection**: All `assisted_run()` calls are automatically synchronized via `FileLock` (stored in `tempfile.gettempdir()/virtuoso_fifo.lock`).
 
+---
+
+## 5. Reloading the Server
+When server codebase or configs change, the running Python process must be restarted. Refer to [`context/coder/mcp_reload_guide.md`](mcp_reload_guide.md) for full restart procedures (process kill, IDE restart, CLI restart, and daemon reload).
+
+
