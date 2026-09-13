@@ -112,8 +112,9 @@ When collaborating with another coding or designer agent (via a meta-harness, `a
      ```bash
      git -c user.name="<AgentName>" -c user.email="<agent>@ai.local" commit -m "<type>: <concise description>"
      ```
-3. **Collaborator Satisfaction Gate**:
+3. **Collaborator Satisfaction & Session ID Inquiry Gate**:
    - Continuously coordinate with the collaborating agent, iterate on changes, and incorporate their feedback.
+   - **Ask for Session ID**: When you think a task is well-scoped and completed, ask the collaborating / Designer Agent for its active `Session ID` (if not already verified) so it can be cited in the PR header.
    - **Do NOT open a PR prematurely**: Open the Pull Request only after the changes are completed, tested, and the collaborating agent has explicitly verified and confirmed full satisfaction with the implementation.
 4. **Pull Request Header with Both Session IDs**:
    - The PR description MUST begin with a prominent metadata header containing both your Coder Agent session ID and the collaborating/Designer Agent session ID:
@@ -134,6 +135,25 @@ When collaborating with another coding or designer agent (via a meta-harness, `a
    - Pull Requests must **not be artificially low-scoped** (e.g. splitting closely related bugfixes, client adjustments, and documentation into multiple disjoint micro-PRs).
    - A PR can and should contain a complete set of related fixes and enhancements if they pertain to the same functional milestone, feature request, or interconnected bug set.
    - Bundle the backend code changes, client fixes, unit tests, and operational documentation together so the human reviewer can inspect and verify the entire holistic feature set in one review cycle.
+7. **Nested PRs (Stacked Branches) for Continuous Development**:
+   - Because Coder Agents cannot merge PRs to `main`, an open PR often sits awaiting human code review. If subsequent tasks need to build on top of those unmerged changes, you do not have to wait or stall execution.
+   - **Branch Off Active Feature Branch**: Create a stacked branch based on the previous unmerged feature branch:
+     ```bash
+     git checkout -b <agent_name>/<next-feature-name> <agent_name>/<parent-feature-branch>
+     ```
+   - **Develop on Top of Previous Commits**: Continue implementing the next set of fixes incrementally on top of the parent branch commits.
+   - **Create a Nested Pull Request**: Push the stacked branch and open a nested PR targeting the parent branch via `--base`:
+     ```bash
+     gh pr create \
+       --base <agent_name>/<parent-feature-branch> \
+       --title "<type>(<scope>): <next feature description>" \
+       --body "> [!NOTE]
+     > **Nested PR (Stacked on top of #<parent_pr_number>)**
+     > ...
+     "
+     ```
+   - **Maintain Clean Separation**: The nested PR displays only the new delta on top of the parent branch, keeping review scopes cleanly separated.
+   - **Retargeting upon Parent Merge**: Once the human maintainer merges the parent PR to `main`, GitHub automatically updates or prompts retargeting the nested PR to `main` (`gh pr edit <pr_number> --base main`).
 
 ---
 
@@ -213,11 +233,11 @@ Layout XL previously assumed an active GUI session (assisted_run). Autonomous wo
 ## Step-by-Step Coder Execution Checklist
 
 1. [ ] **Inspect Task/Issue**: Read issue or collaborator instructions. Extract peer `Session ID` if present.
-2. [ ] **Create Dedicated Branch**: Run `git checkout -b <agent_name>/<task-description>`.
+2. [ ] **Create Dedicated Branch**: Run `git checkout -b <agent_name>/<task-description>`. If building on top of an unmerged PR, branch off the parent feature branch.
 3. [ ] **Implement Changes Incrementally**: Edit source or docs, committing each change as you go with custom agent author identity (`git commit -m "..."`).
 4. [ ] **Verify Tests**: Run `python3 -m unittest discover tests` and any domain-specific verifications (DRC/LVS/simulation).
-5. [ ] **Collaborator Satisfaction**: Ensure the collaborating agent has reviewed and confirmed complete satisfaction.
+5. [ ] **Collaborator Satisfaction & Session ID**: Ensure the collaborating agent has reviewed and confirmed complete satisfaction. Ask for active `Session ID` if not yet confirmed.
 6. [ ] **Reload MCP Server (if backend changed)**: Follow [`mcp_reload_guide.md`](mcp_reload_guide.md) to restart the server and run sanity checks.
 7. [ ] **Push Branch**: Run `git push origin <agent_name>/<task-description>`.
-8. [ ] **Open Pull Request**: Group related fixes and context updates together (avoid low-scoped PRs). Run `gh pr create` with dual-session header, Motivation/Problem, Solution, Verification, and Other Useful Info.
+8. [ ] **Open Pull Request (Direct or Nested)**: Group related fixes together (avoid low-scoped PRs). Run `gh pr create` with dual-session header, Motivation/Problem, Solution, Verification, and Other Useful Info. If stacked, use `--base <parent_branch>` to create a nested PR.
 9. [ ] **Stop & Request Human Review**: Stop execution and inform the human reviewer. Never auto-merge.
