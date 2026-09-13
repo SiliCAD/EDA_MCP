@@ -125,13 +125,19 @@ Use this fallback only when a headless workflow is required and the GUI form flo
      fprintf(fp "simNotIncremental = 't\nsimReNetlistAll = 't\n")
      fprintf(fp "simViewList = '(\"auCdl\" \"auSchematic\" \"auGate_sch\" \"auGate_cdl\" \"auCmos_sch\" \"schematic\" \"gate_sch\" \"cmos_sch\" \"symbol\")\n")
      fprintf(fp "simStopList = '(\"auCdl\")\n")
-     fprintf(fp "simNetlistHier = t\n")
+     fprintf(fp "simNetlistHier = 't\n")
+     fprintf(fp "incFILE = \"\"\n")
+     fprintf(fp "connects = \"\"\n")
+     fprintf(fp "setEQUIV = \"\"\n")
+     fprintf(fp "shortRES = 2000\n")
+     fprintf(fp "displayPININFO = 't\n")
+     fprintf(fp "checkScale = \"meter\"\n")
      fprintf(fp "hnlNetlistFileName = \"%s.net\"\n" "<cellName>")
      fprintf(fp "auCdlDefNetlistProc = \"ansCdlSubcktCall\"\n")
      drain(fp) close(fp)
    )
    ```
-2. Execute via `virtuoso(action="run_terminal_command")` and copy the result to `<ELDO_WORKDIR>`.
+2. Execute via `virtuoso(action="run_terminal_command", command="si -batch -command netlist")` and copy the result to `<ELDO_WORKDIR>`.
 
 ## Error handling
 
