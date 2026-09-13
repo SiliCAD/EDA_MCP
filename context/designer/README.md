@@ -2,13 +2,12 @@
 
 This is an operational specification for an AI agent that designs, inspects, and simulates circuits through EDA-MCP. It is not a user tutorial and it does not prescribe one circuit-design method. Apply engineering judgment: choose an appropriate topology, analysis, execution mode, and amount of explanation from the user's objective, supplied constraints, and available tool capabilities.
 
-> [!WARNING]
-> ### CRITICAL DISCLAIMER: `assisted_run` REQUIRES HUMAN GUI INITIALIZATION
-> **`virtuoso(action="assisted_run")` is NOT fully autonomous / headless.** It strictly requires a human user to manually open the Virtuoso GUI session on the server, dismiss initial license popups, and initialize the session before any commands can be received.
->
-> **Autonomous Agent Directive:**
-> 1. **Always default to `virtuoso:standalone` (`-nograph`)**: If a task or guide can be executed in standalone mode (schematic validation, batch CDL netlisting via `si`, batch Layout XL via `lxGenFromSource`), **USE STANDALONE ONLY**.
-> 2. **Never fall back to `assisted_run` autonomously**: If you get stuck or encounter limitations in `standalone` mode, **STOP and ping the user** to ask for assistance or GUI session initialization instead of blindly calling `assisted_run`.
+> [!NOTE]
+> ### Execution Mode Guidelines: `assisted_run` vs `standalone`
+> Virtuoso operations can be executed through two distinct modes depending on session setup:
+> - **`assisted_run` (Interactive GUI Mode)**: Dispatches commands directly to an active Virtuoso GUI session on the server. This requires the user to have launched the Virtuoso GUI and initialized the session (handling any startup/license popups). When working in `assisted_run`, use the standard GUI-tier workflow: open the cellview in the graphic window via `deOpen` (`"Layout XL"`), generate components via `lxGenerateStart` / `lxGenerateFinish`, and leverage native interactive tools (analog placers, VSR router).
+> - **`standalone` (Headless Batch Mode `-nograph`)**: When working in standalone/headless batch mode without an active GUI, use the standalone batch techniques: `lxGenFromSource` for Layout XL generation, batch `si` for CDL netlisting, and direct OpenAccess database operations.
+> - **Agent Directive**: If working in `standalone` mode and you get stuck or run into limitations, **ping the user** instead of attempting to fall back to `assisted_run` (which requires an active GUI session).
 
 ## Fast-agent execution contract
 
@@ -23,7 +22,10 @@ Apply these defaults before consulting the detailed guides:
 7. Build `tb_<cell>.cir` in WorkBoard (use `write_to_file` without `ArtifactMetadata` for workspace files, or write `.txt` and `mv` to `.cir`), include process corner, and run Eldo from testbench—not raw `.net`.
 8. Retrieve artifacts through WorkBoard and report assumptions with results.
 9. After an `assisted_run` timeout, do not resend the mutating command: the cell state is unknown. Recover, inspect, and continue from observed state.
-10. For layout creation, always use headless batch Layout XL in `virtuoso:standalone` (`-nograph`) via `lxGenFromSource(schCV ?layViewName "layout" ?initCreateInstances t ?initCreatePins t ?initCreateBoundary t)`. Binding connectivity reference (`lxSetConnRef`) and verifying LVS equivalence (`lxCheckAgainstSource(schCV layCV)`) are fully supported without any GUI window. Do NOT use `assisted_run` unless the user has explicitly initialized the GUI session and authorized its use.
+10. For layout creation, select the appropriate workflow for your execution mode:
+    - **In `assisted_run` (GUI session initialized by user)**: Open the cellview in Layout XL via `deOpen`, use interactive Generation From Source (`lxGenerateStart` / `lxGenerateFinish`), and use native GUI placement/routing tools.
+    - **In `standalone` (Headless `-nograph`)**: Use Cadence's dedicated batch function `lxGenFromSource(schCV ?layViewName "layout" ?initCreateInstances t ?initCreatePins t ?initCreateBoundary t)`. Binding connectivity (`lxSetConnRef`) and verifying equivalence (`lxCheckAgainstSource`) are fully supported without any GUI window.
+    - If stuck in standalone mode, ping the user rather than arbitrarily switching to `assisted_run`.
 11. In Calibre DRC stream-out (`strmout`), always pass the official PDK layer map (`DK_cmos065lpgp_.../cmos065.layermap`) and `-case Preserve` to avoid the `R_forbidden.1` trap (Layer 15 vs 31). In headless batch decks, unselect density checks (`DRC UNSELECT CHECK ALL_DENSITY_CHECK`) for isolated leaf cells.
 
 ## Authority, scope, and judgment

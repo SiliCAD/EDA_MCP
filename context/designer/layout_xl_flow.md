@@ -39,16 +39,15 @@ Layout operations can be executed either in headless batch mode (`virtuoso -nogr
 
 ### GUI Tier Launch (`assisted_run` - Full Layout XL Suite)
 
-> [!WARNING]
-> ### CRITICAL DISCLAIMER: `assisted_run` REQUIRES HUMAN GUI INITIALIZATION
-> `virtuoso(action="assisted_run")` is **NOT fully autonomous / headless**. It strictly requires a human user to manually open the Virtuoso GUI session on the server, dismiss initial license popups, and initialize the session before commands can be processed.
->
-> **Autonomous Agent Directive:**
-> 1. **Always default to `virtuoso:standalone` (`-nograph`)**: Execute all schematic checks, batch CDL netlisting (`si`), and batch Layout XL generation (`lxGenFromSource`) in standalone mode.
-> 2. **Never fall back to `assisted_run` autonomously**: If stuck in `standalone` mode or encountering errors, **STOP and ping the user** directly to request assistance rather than attempting to call `assisted_run`.
+> [!NOTE]
+> ### `assisted_run` Session Requirement
+> `virtuoso(action="assisted_run")` dispatches SKILL commands to an active Virtuoso GUI session on the server. This requires the user to have launched the Virtuoso GUI and initialized the session (handling startup/license popups).
+> - **When working with `assisted_run`**: Use this interactive GUI-tier method (`deOpen` with `"Layout XL"`, `lxGenerateStart` / `lxGenerateFinish`, native analog placers, and VSR auto-routing).
+> - **When working with `standalone` (`-nograph`)**: Use the headless batch technique (`lxGenFromSource`) detailed in Section 3.1.
+> - **If stuck in `standalone`**: Do not arbitrarily switch to `assisted_run` without an initialized GUI session; **ping the user** instead.
 
-Use this path only when the human user has explicitly initialized the Virtuoso GUI session and authorized interactive tools, native placement, or VSR auto-routing:
-- Commands are dispatched to the server's active Xvnc GUI session (`virtuoso(action="assisted_run")`).
+Use this path when working in an active Virtuoso GUI session to leverage Cadence interactive tools, native placement, or VSR auto-routing:
+- Commands are dispatched to the server's active GUI session (`virtuoso(action="assisted_run")`).
 
 ```lisp
 ;; 1. Ensure empty layout cellview exists in database
