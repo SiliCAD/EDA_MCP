@@ -47,9 +47,27 @@ EDA_MCP/
 
 1. **AGENT_IDENTITY_BRANCHING**: Every issue fix or enhancement MUST be created on a feature branch named `<agent_name>/issue-<issue_number>-<description>` (e.g., `antigravity/issue-42-eldo-timeout-fix`).
 2. **AGENT_IDENTITY_COMMITS**: All commits MUST explicitly declare custom agent author metadata: `git -c user.name="<AgentName>" -c user.email="<agent>@ai.local" commit -m "..."`.
-3. **PULL_REQUEST_EXPLANATION**: Pull Requests MUST be created via `gh pr create` with Metadata Header Banner (`Resolved by Agent`, `agent_model`, `session_id`, `log_file`), PR label auto-creation (`gh label create`), attached `--label "<agent_name>"`, root cause explanation, fix details, test verification, and issue linkage (`Fixes #<issue_number>`).
+3. **PULL_REQUEST_EXPLANATION & SCOPING**: Pull Requests MUST be created via `gh pr create` with Metadata Header Banner (`Resolved by Agent`, `agent_model`, `session_id`, `log_file`), PR label auto-creation (`gh label create`), attached `--label "<agent_name>"`, root cause explanation, fix details, test verification, and issue linkage (`Fixes #<issue_number>`).
+   - **Avoid Low-Scoped PRs**: PRs must **not** be artificially low-scoped. A PR can and should contain a complete, coherent set of related fixes, enhancements, tests, and accompanying documentation together if they are related to the same functional milestone or issue set. Do not fragment related changes into multiple micro-PRs.
 4. **STRICT_NO_AUTOMERGE_POLICY**: Coder Agents MUST NEVER merge PRs or push directly to `main`. Stop execution immediately after `gh pr create` and request Human Code Review.
 5. **PEER_REVIEW_VIA_AGENT_LANDLINE**: When an issue is reported by another AI agent (such as a Chip Design Consumer / Virtuoso & Eldo designer agent), extract the `Session ID` from the issue header banner. Use the `agent-landline` MCP server to initialize that session, prompt the reporting agent to review the changes (for correctness, understandability, and reliability), solicit edge-case critiques, and harden the solution before opening a PR. Note that the designer agent's working directory may be different and they may not have source code access to `EDA_MCP` (and are prohibited from inspecting Python code); review should focus on `.md` operational context, SKILL/SPICE scripts, and tool interface contracts rather than Python implementation files.
+6. **CROSS_AGENT_COLLABORATION_WORKFLOW**: When collaborating with another agent (e.g., a Chip Design Agent or another Coder Agent communicating changes/feature requests):
+   - **Dedicated Branch**: Always implement requested changes on a separate dedicated branch.
+   - **Incremental Atomic Commits**: Commit each change as you are doing it with clear semantic messages and agent author identity.
+   - **Collaborator Satisfaction & Session ID Inquiry**: Once a well-scoped task is completed, ask the collaborating / Designer Agent for its active `Session ID` (if not already known) to ensure the PR metadata banner is accurate. Confirm that the collaborating agent is fully satisfied before opening the PR.
+   - **Cohesive Scope**: Do not create artificially low-scoped PRs. Group the full set of related fixes, architectural improvements, and context updates together in one cohesive PR.
+   - **PR Metadata Header with Both Session IDs**: Open a comprehensive PR whose description begins with a metadata header containing both your Coder Agent session ID (`agy --conversation=<coder_session_id>`) and the collaborating/Designer Agent session ID (`agy --conversation=<designer_session_id>`).
+   - **Required PR Description Sections**:
+     - **Motivation & Problem**: Clear explanation of the motivation or problem statement.
+     - **How Are You Solving It**: Technical breakdown of the changes and architecture.
+     - **Verification**: Exact steps and evidence of verification (unit tests, simulation logs, DRC/LVS results).
+     - **Other Useful Information**: Discoveries, operational caveats, constraints, and summary of changes.
+   - **Human Review Gate**: Never merge the PR; notify the human reviewer.
+7. **NESTED_PRS_FOR_CONTINUOUS_DEVELOPMENT**:
+   - Because Coder Agents cannot merge PRs to `main`, an open PR often sits awaiting human review while subsequent tasks need to build on top of those unmerged changes.
+   - **Branching on Previous Feature Branch**: To use the latest code without blocking, create a stacked branch off the active feature branch (`git checkout -b <agent>/<next-feature> <agent>/<parent-feature>`).
+   - **Nested PR Target (`--base <parent_branch>`)**: Create a **nested PR** targeting the parent feature branch instead of `main` (`gh pr create --base <agent>/<parent-feature>`).
+   - **Benefits**: This preserves logical separation of concerns between distinct tasks/fixes while enabling continuous development. Once the human reviewer merges the parent PR to `main`, the nested PR can be seamlessly retargeted or rebased against `main`.
 
 ---
 
@@ -59,8 +77,9 @@ EDA_MCP/
 
 | Action Trigger / Task Intent | Mandatory Target Spec File | Required Pre-Execution Context Inspection |
 | :--- | :--- | :--- |
-| **GitHub Issue Fixing / Branching / PR Creation** | [`context/coder/issue_resolution_workflow.md`](issue_resolution_workflow.md) | Agent branch naming (`<agent>/issue-<id>-<desc>`), custom author commits, PR label auto-creation (`gh label create`), PR templates, **STRICT NO-AUTOMERGE RULE**. |
+| **GitHub Issue Fixing / Branching / PR Creation** | [`context/coder/issue_resolution_workflow.md`](issue_resolution_workflow.md) | Agent branch naming (`<agent>/issue-<id>-<desc>`), custom author commits, cross-agent collaboration, PR label auto-creation, PR templates, **STRICT NO-AUTOMERGE RULE**. |
 | **Server Architecture / MCP Handler Edits** | [`context/coder/server_and_mcp.md`](server_and_mcp.md) | `FastMCP` session allocations (`RemoteSession`), tool dispatch table, logger setup (`logs/eda_mcp_*.log`). |
+| **Reloading / Restarting MCP Server** | [`context/coder/mcp_reload_guide.md`](mcp_reload_guide.md) | Process termination (`pkill`), IDE reload, CLI restart, remote SKILL reload, and daemon lifecycle. |
 | **SSH / SCP Transport Layer Edits** | [`context/coder/transport_layer.md`](transport_layer.md) | Subshell `csh` sentinel tokens, regex REPL stream matching, OpenSSH `scp -O` parameters. |
 | **Virtuoso / Eldo Tool Client Edits** | [`context/coder/eda_tool_clients.md`](eda_tool_clients.md) | `MCP.command` FIFO pipe IPC state machine, `MCP_setup.il` error trapping, REPL interactive loops. |
 | **WorkBoard Engine Edits** | [`context/coder/workboard_backend.md`](workboard_backend.md) | `.workboard.json` registry schema, `_git_cmd` subprocess wrapper, SHA-256 checksum tracking. |
@@ -70,7 +89,8 @@ EDA_MCP/
 
 ## Coder Context Index
 
-- [`context/coder/issue_resolution_workflow.md`](issue_resolution_workflow.md): Standard operating procedure for Coder agents resolving issues, creating agent branches, PR formatting, and human review gates.
+- [`context/coder/issue_resolution_workflow.md`](issue_resolution_workflow.md): Standard operating procedure for Coder agents resolving issues, cross-agent collaboration, creating agent branches, PR formatting, and human review gates.
+- [`context/coder/mcp_reload_guide.md`](mcp_reload_guide.md): Guide to reloading and restarting the `EDA_MCP` server across CLI, process signals, IDE UI, remote SKILL scripts, and background daemon.
 - [`context/coder/server_and_mcp.md`](server_and_mcp.md): FastMCP tool signatures, tool action dispatching, session isolation logic.
 - [`context/coder/transport_layer.md`](transport_layer.md): Subshell IO pipes, sentinel token format, regex prompt match loop, SCP command generation.
 - [`context/coder/eda_tool_clients.md`](eda_tool_clients.md): FIFO pipe write/read contract, REPL interactive streaming state machine.
