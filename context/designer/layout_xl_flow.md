@@ -39,9 +39,16 @@ Layout operations can be executed either in headless batch mode (`virtuoso -nogr
 
 ### GUI Tier Launch (`assisted_run` - Full Layout XL Suite)
 
-Use this path when leveraging Cadence interactive tools, native placement, or VSR auto-routing:
+> [!WARNING]
+> ### CRITICAL DISCLAIMER: `assisted_run` REQUIRES HUMAN GUI INITIALIZATION
+> `virtuoso(action="assisted_run")` is **NOT fully autonomous / headless**. It strictly requires a human user to manually open the Virtuoso GUI session on the server, dismiss initial license popups, and initialize the session before commands can be processed.
+>
+> **Autonomous Agent Directive:**
+> 1. **Always default to `virtuoso:standalone` (`-nograph`)**: Execute all schematic checks, batch CDL netlisting (`si`), and batch Layout XL generation (`lxGenFromSource`) in standalone mode.
+> 2. **Never fall back to `assisted_run` autonomously**: If stuck in `standalone` mode or encountering errors, **STOP and ping the user** directly to request assistance rather than attempting to call `assisted_run`.
+
+Use this path only when the human user has explicitly initialized the Virtuoso GUI session and authorized interactive tools, native placement, or VSR auto-routing:
 - Commands are dispatched to the server's active Xvnc GUI session (`virtuoso(action="assisted_run")`).
-- Executes **100% headlessly without human intervention**.
 
 ```lisp
 ;; 1. Ensure empty layout cellview exists in database
