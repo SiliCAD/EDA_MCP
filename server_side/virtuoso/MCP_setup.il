@@ -71,4 +71,3 @@ initPdkLibrary("cmos065")
 if( boundp('MCP) && ipcIsAliveProcess(MCP) ipcKillProcess(MCP) )
 MCP = ipcBeginProcess("python -u MCP_sockit.py" "" "MCP_DataHandler")
 
-
