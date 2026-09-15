@@ -138,7 +138,7 @@ graph TB
         end
     end
 
-    LocalSystem ==> Tunnel ==> RemoteCluster
+    LocalSystem ==> SSH ==> RemoteCluster
 ```
 
 ### IPC Data Flow Architectures
