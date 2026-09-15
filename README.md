@@ -36,7 +36,6 @@ Here is the complete suite of silicon engineering tasks AI agents can perform th
 ```mermaid
 flowchart LR
     subgraph Flow["Closed-Loop Autonomous IC Design Lifecycle"]
-        direction LR
         S1["<b>1. Schematic Capture & Sizing</b><br/><i>Cadence Virtuoso (cmos065 schCheck)</i>"] --> S2["<b>2. Virtuoso Layout XL</b><br/><i>GFS, VSR Router, OpenAccess Vias</i>"]
         S2 --> S3["<b>3. Siemens Calibre DRC</b><br/><i>100% Clean SVRF, Viewport Fixes</i>"]
         S3 --> S4["<b>4. Siemens Calibre LVS</b><br/><i>100% Match (0 Mismatches/Shorts)</i>"]
