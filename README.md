@@ -33,15 +33,19 @@
 
 Here is the complete suite of silicon engineering tasks AI agents can perform through `EDA_MCP`:
 
-```mermaid
-flowchart LR
-    subgraph Flow["Closed-Loop Autonomous IC Design Lifecycle"]
-        S1["<b>1. Schematic Capture & Sizing</b><br/><i>Cadence Virtuoso (cmos065 schCheck)</i>"] --> S2["<b>2. Virtuoso Layout XL</b><br/><i>GFS, VSR Router, OpenAccess Vias</i>"]
-        S2 --> S3["<b>3. Siemens Calibre DRC</b><br/><i>100% Clean SVRF, Viewport Fixes</i>"]
-        S3 --> S4["<b>4. Siemens Calibre LVS</b><br/><i>100% Match (0 Mismatches/Shorts)</i>"]
-        S4 --> S5["<b>5. Parasitic Extraction</b><br/><i>Siemens Calibre xRC (PEX .spi)</i>"]
-        S5 --> S6["<b>6. Eldo Post-PEX SPICE</b><br/><i>Pre- vs Post-Layout AC/DC/Tran</i>"]
-    end
+```text
+ ┌───────────────────┐    ┌───────────────────┐    ┌───────────────────┐
+ │ 1. SCHEMATIC &    │ ──►│ 2. VIRTUOSO       │ ──►│ 3. SIEMENS        │
+ │    PDK SIZING     │    │    LAYOUT XL      │    │    CALIBRE DRC    │
+ │ (cmos065 schCheck)│    │ (GFS, VSR, Vias)  │    │ (100% Clean SVRF) │
+ └───────────────────┘    └───────────────────┘    └───────────────────┘
+                                                             │
+ ┌───────────────────┐    ┌───────────────────┐              ▼
+ │ 6. ELDO POST-PEX  │ ◄──│ 5. PARASITIC      │ ◄──┌───────────────────┐
+ │    ANALOG SPICE   │    │    EXTRACTION     │    │ 4. SIEMENS        │
+ │ (AC/DC/Tran/Power)│    │ (Calibre xRC PEX) │    │    CALIBRE LVS    │
+ └───────────────────┘    └───────────────────┘    │ (0 Mismatches)    │
+                                                   └───────────────────┘
 ```
 
 ### 1. 📐 Schematic Capture & PDK Sizing (`Virtuoso`)
