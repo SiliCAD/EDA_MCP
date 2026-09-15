@@ -42,13 +42,6 @@ flowchart LR
         S4 --> S5["<b>5. Parasitic Extraction</b><br/><i>Siemens Calibre xRC (PEX .spi)</i>"]
         S5 --> S6["<b>6. Eldo Post-PEX SPICE</b><br/><i>Pre- vs Post-Layout AC/DC/Tran</i>"]
     end
-
-    style S1 fill:#0f172a,stroke:#38bdf8,stroke-width:2px,color:#f8fafc
-    style S2 fill:#0f172a,stroke:#a855f7,stroke-width:2px,color:#f8fafc
-    style S3 fill:#0f172a,stroke:#ec4899,stroke-width:2px,color:#f8fafc
-    style S4 fill:#0f172a,stroke:#34d399,stroke-width:2px,color:#f8fafc
-    style S5 fill:#0f172a,stroke:#fbbf24,stroke-width:2px,color:#f8fafc
-    style S6 fill:#0f172a,stroke:#f87171,stroke-width:2px,color:#f8fafc
 ```
 
 ### 1. 📐 Schematic Capture & PDK Sizing (`Virtuoso`)
@@ -146,14 +139,6 @@ graph TB
     end
 
     LocalSystem ==> Tunnel ==> RemoteCluster
-
-    style LocalSystem fill:#0f172a,stroke:#38bdf8,stroke-width:2px,color:#f8fafc
-    style FastMCP fill:#1e293b,stroke:#8b5cf6,stroke-width:1px,color:#f8fafc
-    style SSH fill:#1e1e2e,stroke:#10b981,stroke-width:1px,color:#10b981
-    style RemoteCluster fill:#0f172a,stroke:#f59e0b,stroke-width:2px,color:#f8fafc
-    style CadenceSuite fill:#1e293b,stroke:#a855f7,stroke-width:1px,color:#f8fafc
-    style SiemensSuite fill:#1e293b,stroke:#ef4444,stroke-width:1px,color:#f8fafc
-    style PDKs fill:#1e293b,stroke:#34d399,stroke-width:1px,color:#f8fafc
 ```
 
 ### IPC Data Flow Architectures
@@ -249,12 +234,6 @@ flowchart TD
 
     Track1 --- Track1Spec
     Track2 --- Track2Spec
-
-    style Intent fill:#0f172a,stroke:#38bdf8,stroke-width:2px,color:#f8fafc
-    style Track1 fill:#0f172a,stroke:#a855f7,stroke-width:2px,color:#f8fafc
-    style Track2 fill:#0f172a,stroke:#10b981,stroke-width:2px,color:#f8fafc
-    style Track1Spec fill:#1e293b,stroke:#a855f7,stroke-width:1px,color:#f8fafc
-    style Track2Spec fill:#1e293b,stroke:#10b981,stroke-width:1px,color:#f8fafc
 ```
 
 * 📘 **Designer Context Guide**: [`context/designer/README.md`](file:///Users/vs/function/EDA_MCP/context/designer/README.md)
