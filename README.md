@@ -33,19 +33,23 @@
 
 Here is the complete suite of silicon engineering tasks AI agents can perform through `EDA_MCP`:
 
-```text
- ┌───────────────────┐    ┌───────────────────┐    ┌───────────────────┐
- │ 1. SCHEMATIC &    │ ──►│ 2. VIRTUOSO       │ ──►│ 3. SIEMENS        │
- │    PDK SIZING     │    │    LAYOUT XL      │    │    CALIBRE DRC    │
- │ (cmos065 schCheck)│    │ (GFS, VSR, Vias)  │    │ (100% Clean SVRF) │
- └───────────────────┘    └───────────────────┘    └───────────────────┘
-                                                             │
- ┌───────────────────┐    ┌───────────────────┐              ▼
- │ 6. ELDO POST-PEX  │ ◄──│ 5. PARASITIC      │ ◄──┌───────────────────┐
- │    ANALOG SPICE   │    │    EXTRACTION     │    │ 4. SIEMENS        │
- │ (AC/DC/Tran/Power)│    │ (Calibre xRC PEX) │    │    CALIBRE LVS    │
- └───────────────────┘    └───────────────────┘    │ (0 Mismatches)    │
-                                                   └───────────────────┘
+```mermaid
+flowchart LR
+    subgraph Flow["Closed-Loop Autonomous IC Design Lifecycle"]
+        direction LR
+        S1["<b>1. Schematic Capture & Sizing</b><br/><i>Cadence Virtuoso (cmos065 schCheck)</i>"] --> S2["<b>2. Virtuoso Layout XL</b><br/><i>GFS, VSR Router, OpenAccess Vias</i>"]
+        S2 --> S3["<b>3. Siemens Calibre DRC</b><br/><i>100% Clean SVRF, Viewport Fixes</i>"]
+        S3 --> S4["<b>4. Siemens Calibre LVS</b><br/><i>100% Match (0 Mismatches/Shorts)</i>"]
+        S4 --> S5["<b>5. Parasitic Extraction</b><br/><i>Siemens Calibre xRC (PEX .spi)</i>"]
+        S5 --> S6["<b>6. Eldo Post-PEX SPICE</b><br/><i>Pre- vs Post-Layout AC/DC/Tran</i>"]
+    end
+
+    style S1 fill:#0f172a,stroke:#38bdf8,stroke-width:2px,color:#f8fafc
+    style S2 fill:#0f172a,stroke:#a855f7,stroke-width:2px,color:#f8fafc
+    style S3 fill:#0f172a,stroke:#ec4899,stroke-width:2px,color:#f8fafc
+    style S4 fill:#0f172a,stroke:#34d399,stroke-width:2px,color:#f8fafc
+    style S5 fill:#0f172a,stroke:#fbbf24,stroke-width:2px,color:#f8fafc
+    style S6 fill:#0f172a,stroke:#f87171,stroke-width:2px,color:#f8fafc
 ```
 
 ### 1. 📐 Schematic Capture & PDK Sizing (`Virtuoso`)
@@ -108,50 +112,94 @@ Modern Integrated Circuit (IC) design demands high-performance Linux compute clu
 
 ## 🏛️ System Architecture
 
-```
-┌─────────────────────────────────────────────────────────────────────────────────────────┐
-│                              LOCAL SYSTEM (Developer / AI Agent)                        │
-│                                                                                         │
-│  ┌───────────────────────────────────────────────────────────────────────────────────┐  │
-│  │                              EDA_MCP (FastMCP Server)                             │  │
-│  │                                                                                   │  │
-│  │   ┌───────────────┐   ┌───────────────┐   ┌───────────────┐   ┌───────────────┐   │  │
-│  │   │  workboard    │   │   virtuoso    │   │     eldo      │   │remote_control │   │  │
-│  │   └───────┬───────┘   └───────┬───────┘   └───────┬───────┘   └───────┬───────┘   │  │
-│  └───────────┼───────────────────┼───────────────────┼───────────────────┼───────────┘  │
-└──────────────┼───────────────────┼───────────────────┼───────────────────┼──────────────┘
-               │                   │                   │                   │
-               │        OpenSSH ControlMaster Socket (Sub-10ms Latency)    │
-               ▼                   ▼                   ▼                   ▼
-┌─────────────────────────────────────────────────────────────────────────────────────────┐
-│                              REMOTE EDA LINUX SERVER / CLUSTER                          │
-│                                                                                         │
-│  ┌────────────────────┐ ┌────────────────────┐ ┌────────────────────┐ ┌──────────────┐  │
-│  │  Git Workspace /   │ │  Cadence Virtuoso  │ │    Siemens Eldo    │ │ Process PDKs │  │
-│  │  WorkBoard Sync    │ │  SKILL IPC FIFO    │ │   SPICE Simulator  │ │  (cmos065)   │  │
-│  ├────────────────────┤ ├────────────────────┤ ├────────────────────┤ └──────────────┘  │
-│  │ Calibre DRC / LVS  │ │ Virtuoso Layout XL │ │ Calibre xRC PEX    │                   │
-│  └────────────────────┘ └────────────────────┘ └────────────────────┘                   │
-└─────────────────────────────────────────────────────────────────────────────────────────┘
+```mermaid
+graph TB
+    subgraph LocalSystem["LOCAL SYSTEM (Developer / AI Agent IDE)"]
+        subgraph FastMCP["EDA_MCP (FastMCP Server)"]
+            WB["workboard"]
+            VIR["virtuoso"]
+            ELD["eldo"]
+            RC["remote_control"]
+        end
+    end
+
+    subgraph SSH["OpenSSH ControlMaster Socket (Sub-10ms Multiplexed Connection)"]
+        Tunnel["Persistent ControlPersist Unix Domain Socket"]
+    end
+
+    subgraph RemoteCluster["REMOTE EDA LINUX SERVER / CLUSTER"]
+        subgraph SyncTools["Workspace & Control"]
+            GWS["Git Workspace / WorkBoard Sync"]
+            CSH["CSH Subshell Engine"]
+        end
+        subgraph CadenceSuite["Cadence Virtuoso Suite"]
+            V_CIW["Virtuoso CIW & SKILL FIFO"]
+            V_VXL["Virtuoso Layout XL & VSR Router"]
+        end
+        subgraph SiemensSuite["Siemens EDA Verification"]
+            E_SIM["Siemens Eldo SPICE REPL"]
+            C_DRC["Calibre DRC / LVS"]
+            C_PEX["Calibre xRC Parasitic Extraction"]
+        end
+        subgraph PDKs["Process PDKs"]
+            PDK_65["ST cmos065 (65nm LP/GP)"]
+        end
+    end
+
+    LocalSystem ==> Tunnel ==> RemoteCluster
+
+    style LocalSystem fill:#0f172a,stroke:#38bdf8,stroke-width:2px,color:#f8fafc
+    style FastMCP fill:#1e293b,stroke:#8b5cf6,stroke-width:1px,color:#f8fafc
+    style SSH fill:#1e1e2e,stroke:#10b981,stroke-width:1px,color:#10b981
+    style RemoteCluster fill:#0f172a,stroke:#f59e0b,stroke-width:2px,color:#f8fafc
+    style CadenceSuite fill:#1e293b,stroke:#a855f7,stroke-width:1px,color:#f8fafc
+    style SiemensSuite fill:#1e293b,stroke:#ef4444,stroke-width:1px,color:#f8fafc
+    style PDKs fill:#1e293b,stroke:#34d399,stroke-width:1px,color:#f8fafc
 ```
 
 ### IPC Data Flow Architectures
 
 #### 🎨 Cadence Virtuoso Named Pipe FIFO Architecture
-```
-[Local Agent] ──> FastMCP (`virtuoso`) ──> SSH ──> FIFO Pipe `MCP.command` ──> `MCP_sockit.py` ──> Virtuoso CIW / GUI
-                                                                                                        │
-[Local Agent] <── FastMCP (`virtuoso`) <── SSH <── Reads `mcp_output.txt` <── evalstring() <────────────┘
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Agent as Local AI Agent
+    participant MCP as FastMCP (virtuoso)
+    participant SSH as SSH ControlMaster
+    participant FIFO as FIFO Pipe (MCP.command)
+    participant Daemon as IPC Handler (MCP_sockit.py)
+    participant Virtuoso as Virtuoso CIW / GUI Window
+
+    Agent->>MCP: virtuoso(action="assisted_run", script="...")
+    MCP->>SSH: Stream SKILL command
+    SSH->>FIFO: Write to MCP.command
+    FIFO->>Daemon: Read SKILL payload
+    Daemon->>Virtuoso: evalstring() execution
+    Virtuoso-->>Daemon: Return result & status
+    Daemon-->>SSH: Write output to mcp_output.txt
+    SSH-->>MCP: Read mcp_output.txt sentinel
+    MCP-->>Agent: Return JSON tool response
 ```
 
 #### ⚡ Siemens Eldo Interactive SPICE Architecture
-```
-[Local Agent] ──> FastMCP (`eldo`) ──> SSH ──> FIFO Pipe `interactive.fifo` (Held open by `tail -f /dev/null`)
-                                                                                                      │
-                                                                                                      ▼
-                                                                                           `eldo -inter` REPL
-                                                                                                      │
-[Local Agent] <── FastMCP (`eldo`) <── SSH <── Reads `interactive_out.txt` <── Output Stream <────────┘
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Agent as Local AI Agent
+    participant MCP as FastMCP (eldo)
+    participant SSH as SSH ControlMaster
+    participant FIFO as interactive.fifo
+    participant Eldo as eldo -inter REPL Engine
+
+    Agent->>MCP: eldo(action="run_interactive", command="...")
+    MCP->>SSH: Send interactive SPICE command
+    SSH->>FIFO: Pipe command via background tail
+    FIFO->>Eldo: Process REPL command stream
+    Eldo-->>SSH: Stream log output to interactive_out.txt
+    SSH-->>MCP: Parse interactive_out.txt response
+    MCP-->>Agent: Return parsed SPICE measurement / status
 ```
 
 ---
@@ -174,22 +222,40 @@ Modern Integrated Circuit (IC) design demands high-performance Linux compute clu
 
 `EDA_MCP` includes the `eda-mcp-context-router` directive, enabling AI agents to autonomously inspect domain specifications before execution:
 
-```text
-                                 ┌───────────────────────────────┐
-                                 │   AI AGENT (Task Intent)      │
-                                 └───────────────┬───────────────┘
-                                                 │
-                        ┌────────────────────────┴────────────────────────┐
-                        ▼                                                 ▼
-        [TRACK 1: CIRCUIT DESIGN & SIM]                   [TRACK 2: CODEBASE & MAINTENANCE]
-        Inspect: context/designer/README.md               Inspect: context/coder/README.md
-        - PDK: cmos065 (65nm LP/GP)                       - Branching: <agent>/issue-<id>-<desc>
-        - Devices: psvtgp (PMOS), nsvtgp (NMOS)           - Custom Git Agent Author metadata
-        - CDF Units: Width/Length as Micron strings       - Automated PR header generation
-        - Layout XL: lxSetConnRef & GFS Rules             - STRICT NO-AUTOMERGE policy
-        - Calibre DRC: strmout layer map & SVRF           - Test suite validation
-        - Calibre LVS & xRC PEX Extraction                - Inter-Agent Landline Peer Review
-        - Validation: schCheck (0 0) required
+```mermaid
+flowchart TD
+    Intent["<b>AI AGENT</b><br/><i>Task Intent Classification</i>"]
+    
+    Intent -->|Circuit Design / Layout / Sim| Track1["<b>TRACK 1: CIRCUIT DESIGN & SIM</b><br/><i>Inspect: context/designer/README.md</i>"]
+    Intent -->|Codebase Dev / Bug Fixing / PRs| Track2["<b>TRACK 2: CODEBASE & MAINTENANCE</b><br/><i>Inspect: context/coder/README.md</i>"]
+
+    subgraph Track1Spec["Track 1 Directives"]
+        T1_1["• PDK: cmos065 (65nm LP/GP)"]
+        T1_2["• Devices: psvtgp (PMOS), nsvtgp (NMOS)"]
+        T1_3["• CDF Units: Width/Length as Micron strings"]
+        T1_4["• Layout XL: lxSetConnRef & GFS Rules"]
+        T1_5["• Calibre DRC: strmout layer map & SVRF"]
+        T1_6["• Calibre LVS & xRC PEX Extraction"]
+        T1_7["• Validation: schCheck (0 0) required"]
+    end
+
+    subgraph Track2Spec["Track 2 Directives"]
+        T2_1["• Branching: agent/issue-id-desc"]
+        T2_2["• Custom Git Agent Author metadata"]
+        T2_3["• Automated PR header generation"]
+        T2_4["• STRICT NO-AUTOMERGE policy"]
+        T2_5["• Test suite validation"]
+        T2_6["• Inter-Agent Landline Peer Review"]
+    end
+
+    Track1 --- Track1Spec
+    Track2 --- Track2Spec
+
+    style Intent fill:#0f172a,stroke:#38bdf8,stroke-width:2px,color:#f8fafc
+    style Track1 fill:#0f172a,stroke:#a855f7,stroke-width:2px,color:#f8fafc
+    style Track2 fill:#0f172a,stroke:#10b981,stroke-width:2px,color:#f8fafc
+    style Track1Spec fill:#1e293b,stroke:#a855f7,stroke-width:1px,color:#f8fafc
+    style Track2Spec fill:#1e293b,stroke:#10b981,stroke-width:1px,color:#f8fafc
 ```
 
 * 📘 **Designer Context Guide**: [`context/designer/README.md`](file:///Users/vs/function/EDA_MCP/context/designer/README.md)
