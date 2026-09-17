@@ -84,6 +84,104 @@ Here is the complete suite of silicon engineering tasks AI agents can perform th
 
 ---
 
+## 🧠 Multi-Agent Collaboration, Knowledge Base & Mind Map
+
+For developers new to agentic workflows, `EDA_MCP` orchestrates specialized AI agents working concurrently across distinct roles (e.g. a **Coder Agent** maintaining the MCP backend vs a **Designer Agent** driving Cadence Virtuoso & Siemens Eldo). 
+
+Agents consult a structured **Knowledge Base** (domain context specifications) and coordinate through a shared **Mind Map / Active Memory Layer** (`agent-landline` IPC, WorkBoard manifests, and session checkpoints):
+
+```mermaid
+graph TB
+    subgraph KnowledgeBase["📚 KNOWLEDGE BASE & DUAL-TRACK SPECIFICATIONS"]
+        subgraph DesignerSpec["Designer Domain Specs (context/designer/)"]
+            D1["• PDK Rules: cmos065 65nm LP/GP<br/>• Device Sizing: psvtgp / nsvtgp<br/>• Layout XL & GFS Directives<br/>• Calibre DRC/LVS SVRF Specs"]
+        end
+        subgraph CoderSpec["Coder Domain Specs (context/coder/)"]
+            C1["• FastMCP Server & Transport Specs<br/>• Git Branching & PR Workflows<br/>• Landline Collaboration Directives<br/>• MCP Process Reload & Signals"]
+        end
+    end
+
+    subgraph Memory["🧠 MIND MAP & ACTIVE WORKSPACE MEMORY"]
+        M1["• Inter-Agent Landline IPC (agent-landline)<br/>• WorkBoard State Registry (.workboard.json)<br/>• Issue Tracker & Session Checkpoints"]
+    end
+
+    subgraph Agents["🤖 AUTONOMOUS AI AGENTS"]
+        subgraph CoderAgent["Coder / Maintainer Agent"]
+            CA["<b>Coder Agent</b><br/><i>(Codebase & Server Engineer)</i>"]
+            CA_Do["• Modifies Python FastMCP Server<br/>• Maintains SSH/SCP Transports<br/>• Runs Unit Test Suites<br/>• Opens GitHub PRs"]
+        end
+
+        subgraph DesignerAgent["Chip Designer Agent"]
+            DA["<b>Designer Agent</b><br/><i>(Silicon IC Design Engineer)</i>"]
+            DA_Do["• Builds Schematics & Sizes PDK W/L<br/>• Drives Cadence Virtuoso Layout XL<br/>• Fixes Calibre DRC & Verifies LVS<br/>• Runs Eldo Pre-/Post-PEX SPICE Sims"]
+        end
+    end
+
+    subgraph Execution["⚡ REMOTE EDA CLUSTER ENGINES"]
+        E_VIRT["Cadence Virtuoso GUI / FIFO Pipe"]
+        E_ELDO["Siemens Eldo SPICE Simulator"]
+        E_CAL["Siemens Calibre (DRC / LVS / PEX)"]
+        E_PY["EDA_MCP FastMCP Server Core"]
+    end
+
+    %% Relations
+    DesignerSpec ==>|PDK & Tool Guidance| DA
+    CoderSpec ==>|Architecture & Git Guidance| CA
+
+    CA <==>|Peer Review & Bug Reporting| Memory
+    DA <==>|Session Checkpoints & Feedback| Memory
+
+    CA -->|Maintains Codebase| E_PY
+    DA -->|Drives Schematic & Layout| E_VIRT
+    DA -->|Runs Interactive SPICE| E_ELDO
+    DA -->|Executes Physical Verification| E_CAL
+```
+
+---
+
+## 🤖 Agent Directives & Dual-Track Context Routing
+
+`EDA_MCP` includes the `eda-mcp-context-router` directive, enabling AI agents to autonomously inspect domain specifications before execution:
+
+```mermaid
+flowchart TD
+    Intent["<b>AI AGENT</b><br/><i>Task Intent Classification</i>"]
+    
+    Intent -->|Circuit Design / Layout / Sim| Track1["<b>TRACK 1: CIRCUIT DESIGN & SIM</b><br/><i>Inspect: context/designer/README.md</i>"]
+    Intent -->|Codebase Dev / Bug Fixing / PRs| Track2["<b>TRACK 2: CODEBASE & MAINTENANCE</b><br/><i>Inspect: context/coder/README.md</i>"]
+
+    subgraph Track1Spec["Track 1 Directives"]
+        T1_1["• PDK: cmos065 (65nm LP/GP)"]
+        T1_2["• Devices: psvtgp (PMOS), nsvtgp (NMOS)"]
+        T1_3["• CDF Units: Width/Length as Micron strings"]
+        T1_4["• Layout XL: lxSetConnRef & GFS Rules"]
+        T1_5["• Calibre DRC: strmout layer map & SVRF"]
+        T1_6["• Calibre LVS & xRC PEX Extraction"]
+        T1_7["• Validation: schCheck (0 0) required"]
+    end
+
+    subgraph Track2Spec["Track 2 Directives"]
+        T2_1["• Branching: agent/issue-id-desc"]
+        T2_2["• Custom Git Agent Author metadata"]
+        T2_3["• Automated PR header generation"]
+        T2_4["• STRICT NO-AUTOMERGE policy"]
+        T2_5["• Test suite validation"]
+        T2_6["• Inter-Agent Landline Peer Review"]
+    end
+
+    Track1 --- Track1Spec
+    Track2 --- Track2Spec
+```
+
+* 📘 **Designer Context Guide**: [`context/designer/README.md`](file:///Users/vs/function/EDA_MCP/context/designer/README.md)
+  * 📐 [Schematic Flow](file:///Users/vs/function/EDA_MCP/context/designer/schematic_flow.md)
+  * 🎨 [Layout XL Flow](file:///Users/vs/function/EDA_MCP/context/designer/layout_xl_flow.md)
+  * 🔍 [Calibre DRC Flow](file:///Users/vs/function/EDA_MCP/context/designer/calibre_drc_flow.md)
+  * ⚡ [Eldo Simulation Guide](file:///Users/vs/function/EDA_MCP/context/designer/eldo_simulation_guide.md)
+* 📙 **Coder Context Guide**: [`context/coder/README.md`](file:///Users/vs/function/EDA_MCP/context/coder/README.md)
+
+---
+
 ## 💡 Why EDA_MCP? Thoughtful Workspace Technology
 
 Modern Integrated Circuit (IC) design demands high-performance Linux compute clusters hosting multi-gigabyte EDA tool suites (Cadence Virtuoso, Siemens Eldo) and proprietary PDKs (e.g. `cmos065`). However, AI developer tools and LLM agents operate locally inside modern IDEs.
@@ -101,41 +199,31 @@ Modern Integrated Circuit (IC) design demands high-performance Linux compute clu
 
 ## 🏛️ System Architecture
 
-```mermaid
-graph TB
-    subgraph LocalSystem["LOCAL SYSTEM (Developer / AI Agent IDE)"]
-        subgraph FastMCP["EDA_MCP (FastMCP Server)"]
-            WB["workboard"]
-            VIR["virtuoso"]
-            ELD["eldo"]
-            RC["remote_control"]
-        end
-    end
-
-    subgraph SSH["OpenSSH ControlMaster Socket (Sub-10ms Multiplexed Connection)"]
-        Tunnel["Persistent ControlPersist Unix Domain Socket"]
-    end
-
-    subgraph RemoteCluster["REMOTE EDA LINUX SERVER / CLUSTER"]
-        subgraph SyncTools["Workspace & Control"]
-            GWS["Git Workspace / WorkBoard Sync"]
-            CSH["CSH Subshell Engine"]
-        end
-        subgraph CadenceSuite["Cadence Virtuoso Suite"]
-            V_CIW["Virtuoso CIW & SKILL FIFO"]
-            V_VXL["Virtuoso Layout XL & VSR Router"]
-        end
-        subgraph SiemensSuite["Siemens EDA Verification"]
-            E_SIM["Siemens Eldo SPICE REPL"]
-            C_DRC["Calibre DRC / LVS"]
-            C_PEX["Calibre xRC Parasitic Extraction"]
-        end
-        subgraph PDKs["Process PDKs"]
-            PDK_65["ST cmos065 (65nm LP/GP)"]
-        end
-    end
-
-    LocalSystem ==> SSH ==> RemoteCluster
+```text
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│                              LOCAL SYSTEM (Developer / AI Agent)                        │
+│                                                                                         │
+│  ┌───────────────────────────────────────────────────────────────────────────────────┐  │
+│  │                              EDA_MCP (FastMCP Server)                             │  │
+│  │                                                                                   │  │
+│  │   ┌───────────────┐   ┌───────────────┐   ┌───────────────┐   ┌───────────────┐   │  │
+│  │   │  workboard    │   │   virtuoso    │   │     eldo      │   │remote_control │   │  │
+│  │   └───────┬───────┘   └───────┬───────┘   └───────┬───────┘   └───────┬───────┘   │  │
+│  └───────────┼───────────────────┼───────────────────┼───────────────────┼───────────┘  │
+└──────────────┼───────────────────┼───────────────────┼───────────────────┼──────────────┘
+               │                   │                   │                   │
+               │        OpenSSH ControlMaster Socket (Sub-10ms Latency)    │
+               ▼                   ▼                   ▼                   ▼
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│                              REMOTE EDA LINUX SERVER / CLUSTER                          │
+│                                                                                         │
+│  ┌────────────────────┐ ┌────────────────────┐ ┌────────────────────┐ ┌──────────────┐  │
+│  │  Git Workspace /   │ │  Cadence Virtuoso  │ │    Siemens Eldo    │ │ Process PDKs │  │
+│  │  WorkBoard Sync    │ │  SKILL IPC FIFO    │ │   SPICE Simulator  │ │  (cmos065)   │  │
+│  ├────────────────────┤ ├────────────────────┤ ├────────────────────┤ └──────────────┘  │
+│  │ Calibre DRC / LVS  │ │ Virtuoso Layout XL │ │ Calibre xRC PEX    │                   │
+│  └────────────────────┘ └────────────────────┘ └────────────────────┘                   │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ### IPC Data Flow Architectures
@@ -196,113 +284,6 @@ sequenceDiagram
 | **`eldo`** | `start_interactive`, `run_interactive`, `run_script`, `visualize_waveforms`, `run_terminal_command` | **Siemens Eldo SPICE Simulation Engine.** Runs batch `.cir` simulations, streams interactive SPICE REPL commands, parses `.extract` metrics, and launches waveform plotting for pre- and post-layout PEX decks. |
 | **`remote_control`**| `run_command`, `read_file`, `write_file` | **Stateful CSH Subshell Engine.** Executes terminal commands, Calibre DRC/LVS batch scripts, GDSII stream-out (`strmout`), and inspects remote cluster files in persistent environment sessions (`/cadence/cshrc`). |
 | **`report_issue`** | `report_issue` | **Autonomous Meta-Harness Reporter.** Agent-to-agent bug & feature request submission directly to GitHub with auto-attached execution logs, agent headers, and session IDs. |
-
----
-
-## 🤖 Agent Directives & Dual-Track Context Routing
-
-`EDA_MCP` includes the `eda-mcp-context-router` directive, enabling AI agents to autonomously inspect domain specifications before execution:
-
-```mermaid
-flowchart TD
-    Intent["<b>AI AGENT</b><br/><i>Task Intent Classification</i>"]
-    
-    Intent -->|Circuit Design / Layout / Sim| Track1["<b>TRACK 1: CIRCUIT DESIGN & SIM</b><br/><i>Inspect: context/designer/README.md</i>"]
-    Intent -->|Codebase Dev / Bug Fixing / PRs| Track2["<b>TRACK 2: CODEBASE & MAINTENANCE</b><br/><i>Inspect: context/coder/README.md</i>"]
-
-    subgraph Track1Spec["Track 1 Directives"]
-        T1_1["• PDK: cmos065 (65nm LP/GP)"]
-        T1_2["• Devices: psvtgp (PMOS), nsvtgp (NMOS)"]
-        T1_3["• CDF Units: Width/Length as Micron strings"]
-        T1_4["• Layout XL: lxSetConnRef & GFS Rules"]
-        T1_5["• Calibre DRC: strmout layer map & SVRF"]
-        T1_6["• Calibre LVS & xRC PEX Extraction"]
-        T1_7["• Validation: schCheck (0 0) required"]
-    end
-
-    subgraph Track2Spec["Track 2 Directives"]
-        T2_1["• Branching: agent/issue-id-desc"]
-        T2_2["• Custom Git Agent Author metadata"]
-        T2_3["• Automated PR header generation"]
-        T2_4["• STRICT NO-AUTOMERGE policy"]
-        T2_5["• Test suite validation"]
-        T2_6["• Inter-Agent Landline Peer Review"]
-    end
-
-    Track1 --- Track1Spec
-    Track2 --- Track2Spec
-```
-
-* 📘 **Designer Context Guide**: [`context/designer/README.md`](file:///Users/vs/function/EDA_MCP/context/designer/README.md)
-  * 📐 [Schematic Flow](file:///Users/vs/function/EDA_MCP/context/designer/schematic_flow.md)
-  * 🎨 [Layout XL Flow](file:///Users/vs/function/EDA_MCP/context/designer/layout_xl_flow.md)
-  * 🔍 [Calibre DRC Flow](file:///Users/vs/function/EDA_MCP/context/designer/calibre_drc_flow.md)
-  * ⚡ [Eldo Simulation Guide](file:///Users/vs/function/EDA_MCP/context/designer/eldo_simulation_guide.md)
-* 📙 **Coder Context Guide**: [`context/coder/README.md`](file:///Users/vs/function/EDA_MCP/context/coder/README.md)
-
----
-
-### 🧠 Multi-Agent Collaboration, Knowledge Base & Mind Map
-
-For developers new to agentic workflows, `EDA_MCP` orchestrates specialized AI agents working concurrently across distinct roles (e.g. a **Coder Agent** maintaining the MCP backend vs a **Designer Agent** driving Cadence Virtuoso & Siemens Eldo). 
-
-Agents consult a structured **Knowledge Base** (domain context specifications) and coordinate through a shared **Mind Map / Active Memory Layer** (`agent-landline` IPC, WorkBoard manifests, and session checkpoints):
-
-```mermaid
-graph TB
-    subgraph KnowledgeBase["📚 KNOWLEDGE BASE & DUAL-TRACK SPECIFICATIONS"]
-        subgraph DesignerSpec["Designer Domain Specs (context/designer/)"]
-            D1["• PDK Rules: cmos065 65nm LP/GP<br/>• Device Sizing: psvtgp / nsvtgp<br/>• Layout XL & GFS Directives<br/>• Calibre DRC/LVS SVRF Specs"]
-        end
-        subgraph CoderSpec["Coder Domain Specs (context/coder/)"]
-            C1["• FastMCP Server & Transport Specs<br/>• Git Branching & PR Workflows<br/>• Landline Collaboration Directives<br/>• MCP Process Reload & Signals"]
-        end
-    end
-
-    subgraph Memory["🧠 MIND MAP & ACTIVE WORKSPACE MEMORY"]
-        M1["• Inter-Agent Landline IPC (agent-landline)<br/>• WorkBoard State Registry (.workboard.json)<br/>• Issue Tracker & Session Checkpoints"]
-    end
-
-    subgraph Agents["🤖 AUTONOMOUS AI AGENTS"]
-        subgraph CoderAgent["Coder / Maintainer Agent"]
-            CA["<b>Coder Agent</b><br/><i>(Codebase & Server Engineer)</i>"]
-            CA_Do["• Modifies Python FastMCP Server<br/>• Maintains SSH/SCP Transports<br/>• Runs Unit Test Suites<br/>• Opens GitHub PRs"]
-        end
-
-        subgraph DesignerAgent["Chip Designer Agent"]
-            DA["<b>Designer Agent</b><br/><i>(Silicon IC Design Engineer)</i>"]
-            DA_Do["• Builds Schematics & Sizes PDK W/L<br/>• Drives Cadence Virtuoso Layout XL<br/>• Fixes Calibre DRC & Verifies LVS<br/>• Runs Eldo Pre-/Post-PEX SPICE Sims"]
-        end
-    end
-
-    subgraph Execution["⚡ REMOTE EDA CLUSTER ENGINES"]
-        E_VIRT["Cadence Virtuoso GUI / FIFO Pipe"]
-        E_ELDO["Siemens Eldo SPICE Simulator"]
-        E_CAL["Siemens Calibre (DRC / LVS / PEX)"]
-        E_PY["EDA_MCP FastMCP Server Core"]
-    end
-
-    %% Relations
-    DesignerSpec ==>|PDK & Tool Guidance| DA
-    CoderSpec ==>|Architecture & Git Guidance| CA
-
-    CA <==>|Peer Review & Bug Reporting| Memory
-    DA <==>|Session Checkpoints & Feedback| Memory
-
-    CA -->|Maintains Codebase| E_PY
-    DA -->|Drives Schematic & Layout| E_VIRT
-    DA -->|Runs Interactive SPICE| E_ELDO
-    DA -->|Executes Physical Verification| E_CAL
-
-    style KnowledgeBase fill:#0f172a,stroke:#38bdf8,stroke-width:2px,color:#f8fafc
-    style DesignerSpec fill:#1e293b,stroke:#a855f7,stroke-width:1px,color:#f8fafc
-    style CoderSpec fill:#1e293b,stroke:#10b981,stroke-width:1px,color:#f8fafc
-    style Memory fill:#0f172a,stroke:#fbbf24,stroke-width:2px,color:#f8fafc
-    style Agents fill:#0f172a,stroke:#8b5cf6,stroke-width:2px,color:#f8fafc
-    style CoderAgent fill:#1e293b,stroke:#10b981,stroke-width:1px,color:#f8fafc
-    style DesignerAgent fill:#1e293b,stroke:#a855f7,stroke-width:1px,color:#f8fafc
-    style Execution fill:#0f172a,stroke:#ef4444,stroke-width:2px,color:#f8fafc
-```
 
 ---
 
