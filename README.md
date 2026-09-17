@@ -34,18 +34,11 @@
 Here is the complete suite of silicon engineering tasks AI agents can perform through `EDA_MCP`:
 
 ```text
- ┌───────────────────┐    ┌───────────────────┐    ┌───────────────────┐
- │ 1. SCHEMATIC &    │ ──►│ 2. VIRTUOSO       │ ──►│ 3. SIEMENS        │
- │    PDK SIZING     │    │    LAYOUT XL      │    │    CALIBRE DRC    │
- │ (cmos065 schCheck)│    │ (GFS, VSR, Vias)  │    │ (100% Clean SVRF) │
- └───────────────────┘    └───────────────────┘    └───────────────────┘
-                                                             │
- ┌───────────────────┐    ┌───────────────────┐              ▼
- │ 6. ELDO POST-PEX  │ ◄──│ 5. PARASITIC      │ ◄──┌───────────────────┐
- │    ANALOG SPICE   │    │    EXTRACTION     │    │ 4. SIEMENS        │
- │ (AC/DC/Tran/Power)│    │ (Calibre xRC PEX) │    │    CALIBRE LVS    │
- └───────────────────┘    └───────────────────┘    │ (0 Mismatches)    │
-                                                   └───────────────────┘
+┌───────────────────┐    ┌───────────────────┐    ┌───────────────────┐    ┌───────────────────┐    ┌───────────────────┐    ┌───────────────────┐
+│ 1. SCHEMATIC &    │──► │ 2. VIRTUOSO       │──► │ 3. SIEMENS        │──► │ 4. SIEMENS        │──► │ 5. PARASITIC      │──► │ 6. ELDO POST-PEX  │
+│    PDK SIZING     │    │    LAYOUT XL      │    │    CALIBRE DRC    │    │    CALIBRE LVS    │    │    EXTRACTION     │    │    ANALOG SPICE   │
+│ (cmos065 schCheck)│    │ (GFS, VSR, Vias)  │    │ (100% Clean SVRF) │    │  (0 Mismatches)   │    │ (Calibre xRC PEX) │    │ (AC/DC/Tran/Power)│
+└───────────────────┘    └───────────────────┘    └───────────────────┘    └───────────────────┘    └───────────────────┘    └───────────────────┘
 ```
 
 ### 1. 📐 Schematic Capture & PDK Sizing (`Virtuoso`)
