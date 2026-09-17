@@ -242,6 +242,70 @@ flowchart TD
 
 ---
 
+### 🧠 Multi-Agent Collaboration, Knowledge Base & Mind Map
+
+For developers new to agentic workflows, `EDA_MCP` orchestrates specialized AI agents working concurrently across distinct roles (e.g. a **Coder Agent** maintaining the MCP backend vs a **Designer Agent** driving Cadence Virtuoso & Siemens Eldo). 
+
+Agents consult a structured **Knowledge Base** (domain context specifications) and coordinate through a shared **Mind Map / Active Memory Layer** (`agent-landline` IPC, WorkBoard manifests, and session checkpoints):
+
+```mermaid
+graph TB
+    subgraph KnowledgeBase["📚 KNOWLEDGE BASE & DUAL-TRACK SPECIFICATIONS"]
+        subgraph DesignerSpec["Designer Domain Specs (context/designer/)"]
+            D1["• PDK Rules: cmos065 65nm LP/GP<br/>• Device Sizing: psvtgp / nsvtgp<br/>• Layout XL & GFS Directives<br/>• Calibre DRC/LVS SVRF Specs"]
+        end
+        subgraph CoderSpec["Coder Domain Specs (context/coder/)"]
+            C1["• FastMCP Server & Transport Specs<br/>• Git Branching & PR Workflows<br/>• Landline Collaboration Directives<br/>• MCP Process Reload & Signals"]
+        end
+    end
+
+    subgraph Memory["🧠 MIND MAP & ACTIVE WORKSPACE MEMORY"]
+        M1["• Inter-Agent Landline IPC (agent-landline)<br/>• WorkBoard State Registry (.workboard.json)<br/>• Issue Tracker & Session Checkpoints"]
+    end
+
+    subgraph Agents["🤖 AUTONOMOUS AI AGENTS"]
+        subgraph CoderAgent["Coder / Maintainer Agent"]
+            CA["<b>Coder Agent</b><br/><i>(Codebase & Server Engineer)</i>"]
+            CA_Do["• Modifies Python FastMCP Server<br/>• Maintains SSH/SCP Transports<br/>• Runs Unit Test Suites<br/>• Opens GitHub PRs"]
+        end
+
+        subgraph DesignerAgent["Chip Designer Agent"]
+            DA["<b>Designer Agent</b><br/><i>(Silicon IC Design Engineer)</i>"]
+            DA_Do["• Builds Schematics & Sizes PDK W/L<br/>• Drives Cadence Virtuoso Layout XL<br/>• Fixes Calibre DRC & Verifies LVS<br/>• Runs Eldo Pre-/Post-PEX SPICE Sims"]
+        end
+    end
+
+    subgraph Execution["⚡ REMOTE EDA CLUSTER ENGINES"]
+        E_VIRT["Cadence Virtuoso GUI / FIFO Pipe"]
+        E_ELDO["Siemens Eldo SPICE Simulator"]
+        E_CAL["Siemens Calibre (DRC / LVS / PEX)"]
+        E_PY["EDA_MCP FastMCP Server Core"]
+    end
+
+    %% Relations
+    DesignerSpec ==>|PDK & Tool Guidance| DA
+    CoderSpec ==>|Architecture & Git Guidance| CA
+
+    CA <==>|Peer Review & Bug Reporting| Memory
+    DA <==>|Session Checkpoints & Feedback| Memory
+
+    CA -->|Maintains Codebase| E_PY
+    DA -->|Drives Schematic & Layout| E_VIRT
+    DA -->|Runs Interactive SPICE| E_ELDO
+    DA -->|Executes Physical Verification| E_CAL
+
+    style KnowledgeBase fill:#0f172a,stroke:#38bdf8,stroke-width:2px,color:#f8fafc
+    style DesignerSpec fill:#1e293b,stroke:#a855f7,stroke-width:1px,color:#f8fafc
+    style CoderSpec fill:#1e293b,stroke:#10b981,stroke-width:1px,color:#f8fafc
+    style Memory fill:#0f172a,stroke:#fbbf24,stroke-width:2px,color:#f8fafc
+    style Agents fill:#0f172a,stroke:#8b5cf6,stroke-width:2px,color:#f8fafc
+    style CoderAgent fill:#1e293b,stroke:#10b981,stroke-width:1px,color:#f8fafc
+    style DesignerAgent fill:#1e293b,stroke:#a855f7,stroke-width:1px,color:#f8fafc
+    style Execution fill:#0f172a,stroke:#ef4444,stroke-width:2px,color:#f8fafc
+```
+
+---
+
 ## 🛠️ Installation & Setup
 
 ### 1. Requirements
