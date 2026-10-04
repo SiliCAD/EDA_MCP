@@ -6,3 +6,6 @@ __pycache__/
 logs/
 temp/
 workboard/
+.venv/
+discussion-synopsys
+run_remote.py

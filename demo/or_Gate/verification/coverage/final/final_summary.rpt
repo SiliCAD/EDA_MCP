@@ -1,0 +1,10 @@
+name                                     Overall Average      Overall Covered      Code Average         Code Covered         Fsm Average          Fsm Covered          Functional Average   Functional Covered   
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+uvm_pkg                                  n/a                  n/a                  n/a                  n/a                  n/a                  n/a                  n/a                  n/a                  
+|--uvm_test_top                          n/a                  n/a                  n/a                  n/a                  n/a                  n/a                  n/a                  n/a                  
+| |--env                                 n/a                  n/a                  n/a                  n/a                  n/a                  n/a                  n/a                  n/a                  
+| | |--cov                               100.00%              100.00% (40/40)      n/a                  n/a                  n/a                  n/a                  100.00%              100.00% (40/40)      
+top                                      100.00%              100.00% (5/5)        100.00%              100.00% (5/5)        n/a                  n/a                  n/a                  n/a                  
+|--vif                                   100.00%              100.00% (4/4)        100.00%              100.00% (4/4)        n/a                  n/a                  n/a                  n/a                  
+|--dut                                   100.00%              100.00% (3/3)        100.00%              100.00% (3/3)        n/a                  n/a                  n/a                  n/a                  
+| |--u_or_gate_assertions                100.00%              100.00% (16/16)      100.00%              100.00% (3/3)        n/a                  n/a                  100.00%              100.00% (13/13)      

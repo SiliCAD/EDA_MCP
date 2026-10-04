@@ -1,0 +1,24 @@
+# ==============================================================================
+# JasperGold Formal Verification Script for or_gate
+# ==============================================================================
+
+clear -all
+
+# Analyze design and assertions
+analyze -sv -f filelists/formal.f
+
+# Elaborate top-level DUT
+elaborate -top or_gate
+
+# Clock and reset definitions for combinational formal verification
+clock -none
+reset -none
+
+# Prove all assertions and covers
+prove -all
+
+# Report proof results
+report -summary
+report -results
+
+exit

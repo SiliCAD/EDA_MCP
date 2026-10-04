@@ -1,0 +1,131 @@
+<><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
+<> User: shivam22478
+
+Host: edatools-server1.iiitd.edu.in
+
+Report date: Mon 05 Oct 2026 01:11:29 IST
+
+Report options: -detail -metrics functional -out verification/coverage/final/final_functional.rpt -both
+
+Coverage database path: /home/shivam22478/Desktop/UVM/or_Gate/cov_work/scope/final_merged
+
+Coverage model files: /home/shivam22478/Desktop/UVM/or_Gate/cov_work/scope/final_merged/icc_512826b1_747960e3.ucm
+
+Coverage data files: /home/shivam22478/Desktop/UVM/or_Gate/cov_work/scope/final_merged/icc_512826b1_747960e3.ucd
+
+CCF files:  None
+
+
+Coverage database date: Mon 05 Oct 2026 01:11:02 IST
+
+*** There were no refinement files applied ***
+
+  <>
+<><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
+
+Coverage Table Legend
+---------------------
+  EXCL   excluded using refinement rule
+  P-EXCL excluded from parent
+  U-EXCL excluded and unreachable by IEV
+  T-EXCL excluded from type
+  S-EXCL smart excluded using refinement rule
+  EXCL(S) smart indirect excluded
+  EMPTY  all children are excluded
+  CONST  marked constant during simulation
+  IGN    marked ignored during simulation
+  UNG    marked ungradeable during simulation
+  DES    marked deselected during simulation
+  UNR    marked unreachable by IEV
+
+
+Covered+Uncovered Assertion Detail Report, Instance Based
+=========================================================
+
+Instance name: top.dut.u_or_gate_assertions
+Type name: or_gate_assertions
+File name: /home/shivam22478/Desktop/UVM/or_Gate/assertions/or_gate_assertions.sv
+Number of covered assertions: 13 of 13
+Number of uncovered assertions: 0 of 13
+
+Finished Failed Assertion                      Line  Source Code                    
+------------------------------------------------------------------------------------
+4        0      cover_toggle_out_low           88    cover_toggle_out_low:  cover property (@(a or b or out) disable iff ($time == 0 || $isunknown({a, b, out})) (out ##1 !out)); 
+5        0      cover_toggle_out_high          87    cover_toggle_out_high: cover property (@(a or b or out) disable iff ($time == 0 || $isunknown({a, b, out})) (!out ##1 out)); 
+4        0      cover_case_11                  85    cover_case_11: cover property (@(a or b or out) disable iff ($time == 0 || $isunknown({a, b, out})) (a && b && out)); 
+5        0      cover_case_10                  84    cover_case_10: cover property (@(a or b or out) disable iff ($time == 0 || $isunknown({a, b, out})) (a && !b && out)); 
+5        0      cover_case_01                  83    cover_case_01: cover property (@(a or b or out) disable iff ($time == 0 || $isunknown({a, b, out})) (!a && b && out)); 
+5        0      cover_case_00                  82    cover_case_00: cover property (@(a or b or out) disable iff ($time == 0 || $isunknown({a, b, out})) (!a && !b && !out)); 
+5        0      assert_dominance_b             76    assert_dominance_b: assert property (p_dominance_b) 
+5        0      assert_dominance_a             68    assert_dominance_a: assert property (p_dominance_a) 
+5        0      assert_equiv                   59    assert_equiv: assert property (p_functional_equivalence) 
+4        0      assert_truth_11                50    assert_truth_11: assert property (p_truth_11) 
+5        0      assert_truth_10                41    assert_truth_10: assert property (p_truth_10) 
+5        0      assert_truth_01                32    assert_truth_01: assert property (p_truth_01) 
+5        0      assert_truth_00                23    assert_truth_00: assert property (p_truth_00) 
+
+Covered+Uncovered CoverGroup Detail Report, Instance Based
+==========================================================
+
+Instance name: uvm_pkg.uvm_test_top.env.cov
+Type name: uvm_pkg
+File name: /cadence/INCISIVE152/tools/methodology/UVM/CDNS-1.1d/sv/src/uvm_pkg.sv
+Include Files:
+    /cadence/INCISIVE152/tools/methodology/UVM/CDNS-1.1d/sv/src/base/uvm_misc.svh
+    /home/shivam22478/Desktop/UVM/or_Gate/tb/or_gate_coverage.sv
+Number of covered cover bins: 40 of 40
+Number of uncovered cover bins: 0 of 40
+
+Name                           Average, Covered Grade         Line  Source Code                    
+---------------------------------------------------------------------------------------------------
+cg_or                          100.00%, 100.00% (40/40)       12 (or_gate_coverage.sv) covergroup cg_or;              
+|--cp_a                        100.00% (4/4)                  16 (or_gate_coverage.sv) cp_a: coverpoint tr.a {        
+| |--zero                      100.00% (163/1)                17 (or_gate_coverage.sv) bins zero = {1'b0};            
+| |--one                       100.00% (154/1)                18 (or_gate_coverage.sv) bins one  = {1'b1};            
+| |--trans_0_to_1              100.00% (50/1)                 19 (or_gate_coverage.sv) bins trans_0_to_1 = (1'b0 => 1'b1); 
+| |--trans_1_to_0              100.00% (49/1)                 20 (or_gate_coverage.sv) bins trans_1_to_0 = (1'b1 => 1'b0); 
+|--cp_b                        100.00% (4/4)                  23 (or_gate_coverage.sv) cp_b: coverpoint tr.b {        
+| |--zero                      100.00% (166/1)                24 (or_gate_coverage.sv) bins zero = {1'b0};            
+| |--one                       100.00% (151/1)                25 (or_gate_coverage.sv) bins one  = {1'b1};            
+| |--trans_0_to_1              100.00% (78/1)                 26 (or_gate_coverage.sv) bins trans_0_to_1 = (1'b0 => 1'b1); 
+| |--trans_1_to_0              100.00% (77/1)                 27 (or_gate_coverage.sv) bins trans_1_to_0 = (1'b1 => 1'b0); 
+|--cp_out                      100.00% (4/4)                  30 (or_gate_coverage.sv) cp_out: coverpoint tr.out {    
+| |--zero                      100.00% (82/1)                 31 (or_gate_coverage.sv) bins zero = {1'b0};            
+| |--one                       100.00% (235/1)                32 (or_gate_coverage.sv) bins one  = {1'b1};            
+| |--trans_0_to_1              100.00% (52/1)                 33 (or_gate_coverage.sv) bins trans_0_to_1 = (1'b0 => 1'b1); 
+| |--trans_1_to_0              100.00% (50/1)                 34 (or_gate_coverage.sv) bins trans_1_to_0 = (1'b1 => 1'b0); 
+|--cp_a_val                    100.00% (2/2)                  41 (or_gate_coverage.sv) cp_a_val: coverpoint tr.a {    
+| |--zero                      100.00% (163/1)                42 (or_gate_coverage.sv) bins zero = {1'b0};            
+| |--one                       100.00% (154/1)                43 (or_gate_coverage.sv) bins one  = {1'b1};            
+|--cp_b_val                    100.00% (2/2)                  46 (or_gate_coverage.sv) cp_b_val: coverpoint tr.b {    
+| |--zero                      100.00% (166/1)                47 (or_gate_coverage.sv) bins zero = {1'b0};            
+| |--one                       100.00% (151/1)                48 (or_gate_coverage.sv) bins one  = {1'b1};            
+|--cp_out_val                  100.00% (2/2)                  51 (or_gate_coverage.sv) cp_out_val: coverpoint tr.out { 
+| |--zero                      100.00% (82/1)                 52 (or_gate_coverage.sv) bins zero = {1'b0};            
+| |--one                       100.00% (235/1)                53 (or_gate_coverage.sv) bins one  = {1'b1};            
+|--cross_inputs                100.00% (16/16)                38 (or_gate_coverage.sv) cross_inputs: cross cp_a, cp_b; 
+| |--zero,zero                 100.00% (82/1)                 38 (or_gate_coverage.sv) cross_inputs: cross cp_a, cp_b; 
+| |--zero,one                  100.00% (81/1)                 38 (or_gate_coverage.sv) cross_inputs: cross cp_a, cp_b; 
+| |--zero,trans_0_to_1         100.00% (39/1)                 38 (or_gate_coverage.sv) cross_inputs: cross cp_a, cp_b; 
+| |--zero,trans_1_to_0         100.00% (33/1)                 38 (or_gate_coverage.sv) cross_inputs: cross cp_a, cp_b; 
+| |--one,zero                  100.00% (84/1)                 38 (or_gate_coverage.sv) cross_inputs: cross cp_a, cp_b; 
+| |--one,one                   100.00% (70/1)                 38 (or_gate_coverage.sv) cross_inputs: cross cp_a, cp_b; 
+| |--one,trans_0_to_1          100.00% (39/1)                 38 (or_gate_coverage.sv) cross_inputs: cross cp_a, cp_b; 
+| |--one,trans_1_to_0          100.00% (44/1)                 38 (or_gate_coverage.sv) cross_inputs: cross cp_a, cp_b; 
+| |--trans_0_to_1,zero         100.00% (26/1)                 38 (or_gate_coverage.sv) cross_inputs: cross cp_a, cp_b; 
+| |--trans_0_to_1,one          100.00% (24/1)                 38 (or_gate_coverage.sv) cross_inputs: cross cp_a, cp_b; 
+| |--trans_0_to_1,trans_0_to_1 100.00% (13/1)                 38 (or_gate_coverage.sv) cross_inputs: cross cp_a, cp_b; 
+| |--trans_0_to_1,trans_1_to_0 100.00% (17/1)                 38 (or_gate_coverage.sv) cross_inputs: cross cp_a, cp_b; 
+| |--trans_1_to_0,zero         100.00% (26/1)                 38 (or_gate_coverage.sv) cross_inputs: cross cp_a, cp_b; 
+| |--trans_1_to_0,one          100.00% (23/1)                 38 (or_gate_coverage.sv) cross_inputs: cross cp_a, cp_b; 
+| |--trans_1_to_0,trans_0_to_1 100.00% (9/1)                  38 (or_gate_coverage.sv) cross_inputs: cross cp_a, cp_b; 
+| |--trans_1_to_0,trans_1_to_0 100.00% (9/1)                  38 (or_gate_coverage.sv) cross_inputs: cross cp_a, cp_b; 
+|--cross_a_out                 100.00% (3/3)                  57 (or_gate_coverage.sv) cross_a_out: cross cp_a_val, cp_out_val { 
+| |--zero,zero                 100.00% (82/1)                 57 (or_gate_coverage.sv) cross_a_out: cross cp_a_val, cp_out_val { 
+| |--zero,one                  100.00% (81/1)                 57 (or_gate_coverage.sv) cross_a_out: cross cp_a_val, cp_out_val { 
+| |--one,one                   100.00% (154/1)                57 (or_gate_coverage.sv) cross_a_out: cross cp_a_val, cp_out_val { 
+|--cross_b_out                 100.00% (3/3)                  61 (or_gate_coverage.sv) cross_b_out: cross cp_b_val, cp_out_val { 
+| |--zero,zero                 100.00% (82/1)                 61 (or_gate_coverage.sv) cross_b_out: cross cp_b_val, cp_out_val { 
+| |--zero,one                  100.00% (84/1)                 61 (or_gate_coverage.sv) cross_b_out: cross cp_b_val, cp_out_val { 
+| |--one,one                   100.00% (151/1)                61 (or_gate_coverage.sv) cross_b_out: cross cp_b_val, cp_out_val { 
+
