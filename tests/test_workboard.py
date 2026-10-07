@@ -50,6 +50,12 @@ class TestWorkBoardClient(unittest.TestCase):
         self.assertTrue(os.path.exists(os.path.join(wb_dir, ".git")))
         self.assertTrue(os.path.exists(os.path.join(wb_dir, ".workboard.json")))
 
+    def test_initialize_leaves_clean_tree(self):
+        self.client.initialize(workboard_name="inv_tb")
+        wb_dir = os.path.join(self.test_dir, "inv_tb")
+        _, out, _ = self.client._git_cmd(wb_dir, ["status", "--short"])
+        self.assertEqual(out.strip(), "")
+
     def test_export(self):
         self.client.initialize(workboard_name="inv_tb")
         wb_dir = os.path.join(self.test_dir, "inv_tb")

@@ -170,7 +170,8 @@ class WorkBoardClient:
 
         # Git init if not already a git repo
         git_dir = os.path.join(wb_dir, ".git")
-        if not os.path.exists(git_dir):
+        is_new = not os.path.exists(git_dir)
+        if is_new:
             ret, out, err = self._git_cmd(wb_dir, ["init"])
             if ret == 0:
                 output.append("Initialized local Git repository.")
@@ -189,6 +190,11 @@ class WorkBoardClient:
         registry = self._load_registry(wb_dir, name)
         self._save_registry(wb_dir, registry)
         output.append(f"Created .workboard.json manifest.")
+
+        # Commit scaffolding on first init so the board starts with a clean working tree
+        if is_new:
+            self._git_cmd(wb_dir, ["add", "-f", ".gitignore", ".workboard.json"])
+            self._git_cmd(wb_dir, ["commit", "-m", f"WorkBoard Initialize: {name}"])
 
         return "\n".join(output)
 
