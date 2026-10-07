@@ -35,7 +35,7 @@ class TestCommandGuardBlocks(unittest.TestCase):
         self.assertBlocked("rm -rf ~/Desktop/cmos65", contains="allowed root directory")
         self.assertBlocked("rm -rf ~/Desktop/cmos65/")
         self.assertBlocked("rm -rf /tmp")
-        self.assertBlocked("rm -rf ~/Desktop/cmos65/*", contains="wildcards the top level")
+        self.assertBlocked("rm -rf ~/Desktop/cmos65/*", contains="matches everything at the top level")
         self.assertBlocked("cd ~/Desktop/eldo && rm -rf *")
         self.assertBlocked("mv ~/Desktop/cmos65 /tmp/x")
 
@@ -62,6 +62,39 @@ class TestCommandGuardBlocks(unittest.TestCase):
         self.assertBlocked("eval rm -rf ~")
         self.assertBlocked("sudo rm -rf /")
         self.assertBlocked("FOO=1 rm -rf ~")
+
+
+class TestCommandGuardPeerReviewFindings(unittest.TestCase):
+    """Gaps found by the verification agent during live testing (issue #55 peer review)."""
+    def setUp(self):
+        self.g = CommandGuard()
+
+    def test_extension_filtered_cleanup_allowed(self):
+        for cmd in ["rm -f ~/Desktop/eldo/*.chi", "cd ~/Desktop/eldo && rm -f *.chi *.raw",
+                    "find ~/Desktop/cmos65 -name '*.cdslck' -delete",
+                    "find ~/Desktop/cmos65 -name '*.cdslck' -exec rm -f {} +",
+                    "find ~ -name '*.cir' -exec cat {} \\;"]:
+            self.assertTrue(self.g.validate(cmd)[0], cmd)
+
+    def test_match_all_still_blocked(self):
+        for cmd in ["rm -rf ~/Desktop/cmos65/*", "rm -rf ~/Desktop/cmos65/.*", "rm -rf ~/Desktop/cmos65/*.*",
+                    "rm -rf ~/Desktop/cmos65/[a-z]*", "find ~/Desktop/cmos65 -delete",
+                    "find ~/Desktop/cmos65 -name '*' -delete", "find ~ -name '*.log' -delete"]:
+            self.assertFalse(self.g.validate(cmd)[0], cmd)
+
+    def test_other_writers_checked(self):
+        self.assertFalse(self.g.validate("sed -i 's/a/b/' ~/.cshrc")[0])
+        self.assertFalse(self.g.validate("sed -i.bak -e 's/a/b/' ~/.cshrc")[0])
+        self.assertTrue(self.g.validate("sed -i 's/a/b/' ~/Desktop/eldo/tb.cir")[0])
+        self.assertTrue(self.g.validate("sed -n 's/a/b/p' ~/.cshrc")[0])
+        self.assertFalse(self.g.validate("dd if=/dev/zero of=~/.cshrc")[0])
+        self.assertTrue(self.g.validate("dd if=/tmp/a of=/tmp/b")[0])
+
+    def test_inline_interpreter_code(self):
+        self.assertFalse(self.g.validate('python3 -c "import os; os.remove(\'/home/x/.cshrc\')"')[0])
+        self.assertFalse(self.g.validate('python3 -c "import shutil; shutil.rmtree(\'/x\')"')[0])
+        self.assertFalse(self.g.validate('perl -e "unlink glob q{~/*}"')[0])
+        self.assertTrue(self.g.validate('python3 -c "print(1+1)"')[0])
 
 
 class TestCommandGuardAllows(unittest.TestCase):

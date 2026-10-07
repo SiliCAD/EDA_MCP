@@ -31,6 +31,15 @@ PREFIX_WORDS = {"sudo", "nohup", "time", "command", "builtin", "exec", "env", "n
 # Shells / eval whose string argument is itself a command line to check.
 NESTED_SHELLS = {"sh", "bash", "csh", "tcsh", "zsh", "ksh"}
 
+# Inline-code interpreters; their code is scanned for file-deleting / file-writing calls.
+INTERPRETERS = {"python", "python2", "python3", "perl", "ruby", "node", "tclsh"}
+INLINE_DESTRUCTIVE = re.compile(
+    r"\b(remove|unlink|rmdir|rmtree|truncate|system|popen|subprocess|exec[lv]?p?e?|spawn)\s*\("
+    r"|\bopen\s*\([^)]*,\s*['\"][wa]"
+    r"|\b(unlink|rmtree|system)\b"
+)
+FIND_NAME_FILTERS = {"-name", "-iname", "-path", "-ipath", "-regex", "-iregex"}
+
 SEPARATORS = {";", "&&", "||", "|", "&", "\n", "(", ")"}
 REDIRECTS = {">", ">>", ">|", "&>", "&>>", ">>&", ">&"}
 
@@ -116,9 +125,18 @@ class CommandGuard:
             if path == root:
                 return f"{what} would delete the allowed root directory '{root}' itself"
             first_level = path[len(root.rstrip('/')) + 1:].split("/", 1)[0]
-            if any(ch in first_level for ch in "*?["):
-                return f"{what} target '{raw}' wildcards the top level of '{root}'; name the specific sub-directory"
+            if "/" not in path[len(root.rstrip('/')) + 1:] and self._is_match_all(first_level):
+                return (f"{what} target '{raw}' matches everything at the top level of '{root}'; "
+                        f"name a sub-directory or filter by extension (e.g. '*.chi')")
         return None
+
+    @staticmethod
+    def _is_match_all(pattern: str) -> bool:
+        """True for wildcards that select (nearly) every entry: '*', '.*', '*.*', '[a-z]*', ..."""
+        if not any(ch in pattern for ch in "*?["):
+            return False
+        literal = re.sub(r"\[[^\]]*\]|[*?.]", "", pattern)
+        return literal == ""
 
     # ---------- command parsing ----------
 
@@ -199,7 +217,7 @@ class CommandGuard:
 
             if cmd == "eval" or (cmd in NESTED_SHELLS and "-c" in args):
                 inner = " ".join(args[1:]) if cmd == "eval" else (args[args.index("-c") + 1] if args.index("-c") + 1 < len(args) else "")
-                ok, reason = self.validate(inner)
+                ok, reason = self.validate(inner, cwd=cwd)
                 if not ok:
                     return False, f"{reason} (inside {cmd})"
                 continue
@@ -213,11 +231,35 @@ class CommandGuard:
                 cwd = resolved
                 continue
 
-            if cmd == "find" and ("-delete" in args or "-exec" in args):
-                roots = [a for a in args[1:] if not a.startswith("-") and not a.startswith("(")][:1] or ["."]
-                reason = self._check_target(roots[0], cwd, deleting=True, what="find -delete/-exec")
+            if cmd == "find":
+                reason = self._check_find(args, cwd)
                 if reason:
                     return False, f"Blocked: {reason}"
+                continue
+
+            if cmd in INTERPRETERS and ("-c" in args or "-e" in args):
+                flag = "-c" if "-c" in args else "-e"
+                code = args[args.index(flag) + 1] if args.index(flag) + 1 < len(args) else ""
+                if INLINE_DESTRUCTIVE.search(code):
+                    return False, (f"Blocked: inline {cmd} code deletes/writes files or spawns commands, so its targets "
+                                   f"can't be verified before running; use rm/mv on explicit paths instead")
+                continue
+
+            if cmd == "sed" and any(a == "-i" or a.startswith("-i") or a.startswith("--in-place") for a in args[1:]):
+                has_script_flag = any(a in ("-e", "-f") or a.startswith("--expression") for a in args[1:])
+                files = operands if has_script_flag else operands[1:]
+                for f in files:
+                    reason = self._check_target(f, cwd, deleting=False, what="sed -i")
+                    if reason:
+                        return False, f"Blocked: {reason}"
+                continue
+
+            if cmd == "dd":
+                for a in args[1:]:
+                    if a.startswith("of="):
+                        reason = self._check_target(a[3:], cwd, deleting=False, what="dd")
+                        if reason:
+                            return False, f"Blocked: {reason}"
                 continue
 
             if cmd not in DESTRUCTIVE_CMDS:
@@ -238,6 +280,23 @@ class CommandGuard:
                     return False, f"Blocked: {reason}"
 
         return True, "Allowed"
+
+    def _check_find(self, args: List[str], cwd: Optional[str]) -> Optional[str]:
+        """find is only checked when it deletes (-delete, or -exec/-execdir/-ok running a destructive command)."""
+        deleting = "-delete" in args
+        for flag in ("-exec", "-execdir", "-ok", "-okdir"):
+            if flag in args and args.index(flag) + 1 < len(args):
+                if posixpath.basename(args[args.index(flag) + 1]) in DESTRUCTIVE_CMDS:
+                    deleting = True
+        if not deleting:
+            return None
+        start = next((a for a in args[1:] if not a.startswith("-") and a not in ("(", "!")), ".")
+        name_patterns = [args[i + 1] for i, a in enumerate(args[:-1]) if a in FIND_NAME_FILTERS]
+        filtered = any(not self._is_match_all(p) for p in name_patterns)
+        path = self._resolve(start, cwd)
+        if filtered and path is not None and self._containing_root(path) is not None:
+            return None  # e.g. find ~/Desktop/cmos65 -name '*.cdslck' -delete
+        return self._check_target(start, cwd, deleting=True, what="find -delete/-exec")
 
     def check_write_path(self, path: str) -> Tuple[bool, str]:
         """Validates a direct remote file write (remote_control write_file)."""
