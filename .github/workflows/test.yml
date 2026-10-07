@@ -33,3 +33,8 @@ jobs:
       run: |
         python -m unittest discover -s tests -p "test_workboard_root_resolution.py"
         python -m unittest discover -s tests -p "test_daemon.py"
+
+    - name: Run Command Guard Tests (issue #55)
+      run: |
+        python -m unittest discover -s tests -p "test_command_guard.py"
+        python -m unittest discover -s tests -p "test_command_guard_server.py"
