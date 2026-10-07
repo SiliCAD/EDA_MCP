@@ -1,4 +1,4 @@
-mcp>=1.0.0
+mcp>=1.0.0,<2
 paramiko>=3.0.0
 python-dotenv>=1.0.0
 PyLTSpice>=6.0.0
