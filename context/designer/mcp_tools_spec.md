@@ -92,15 +92,17 @@ type WorkBoardArgs = {
   action: "initialize" | "add" | "export" | "pull" | "push" | "diff" | "status" | "history";
   workboard_name?: string; // Default: "default"
   remote_path?: string;    // Required for add/export
-  local_path?: string;     // Relative local path in ./workboard/<name>/
+  local_path?: string;     // Relative local path in <workspace_root>/workboard/<name>/
   message?: string;        // Commit message for export/push (Default: "Agent sync")
   overwrite?: boolean;     // Default: false (protects existing remote file on export)
-  timeout?: number;        // Default: 60.0s
+  timeout?: number;        // Default: 180.0s per SCP transfer (raise for large .chi/.spi3 files)
+  workspace_root?: string; // Absolute project path; WorkBoards live in <workspace_root>/workboard/. Sticky per session.
 };
 ```
 
 ### Action Modes & Auto-Advance Behavior
-- `initialize`: Creates `./workboard/<name>/` and runs `git init`.
+- Root resolution: `workspace_root` arg > `WORKBOARD_ROOT` env > MCP client root > EDA_MCP repo. See [`workboard_sync_guide.md`](workboard_sync_guide.md).
+- `initialize`: Creates `<workspace_root>/workboard/<name>/` and runs `git init`.
 - `add`: Downloads remote file via SCP, registers in `.workboard.json`, commits locally ($C_{\text{sync}} = \text{HEAD}$).
 - `pull`: Re-fetches remote file, updates local WorkBoard, commits locally ($C_{\text{sync}} = \text{HEAD}$).
 - `push`: Uploads local edits to remote server via SCP, commits locally ($C_{\text{sync}} = \text{HEAD}$).

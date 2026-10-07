@@ -3,8 +3,12 @@
 ## 1. Directory Structure & Registry Schema ([`workboard_client.py`](../../src/clients/workboard_client.py))
 
 ### Path Binding
-- Base Directory: `./workboard/<workboard_name>/`
-- Manifest File: `./workboard/<workboard_name>/.workboard.json`
+- Base Directory: `<workspace_root>/workboard/<workboard_name>/`
+- Manifest File: `<workspace_root>/workboard/<workboard_name>/.workboard.json`
+- Root resolution lives in `src/server.py::_resolve_workboard_root` and runs on every `workboard` call:
+  `workspace_root` arg (sticky in `_workboard_explicit_root`) > `WORKBOARD_ROOT` env > MCP client `roots/list` (only if the client declares the roots capability, 5s cap) > `EDA_MCP/workboard`.
+- `WorkBoardClient.set_workspace_root()` maps `<root>` to `<root>/workboard` (paths already named `workboard` are kept) and clears `active_workboard` when the root changes. `root_source` is shown in `status`.
+- The MCP tool is `async`; SCP/git work runs in `anyio.to_thread.run_sync` (`_workboard_sync`). Callers such as `daemon.py` must `await workboard(...)`.
 
 ### `.workboard.json` Schema Structure
 ```json
