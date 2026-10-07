@@ -1,5 +1,5 @@
 import unittest
-from unittest.mock import patch
+from unittest.mock import patch, AsyncMock
 from fastapi.testclient import TestClient
 from daemon import app
 from src.clients.eda_client import EDADaemonClient
@@ -36,7 +36,7 @@ class TestDaemon(unittest.TestCase):
         self.assertEqual(resp.json(), {"result": "Simulation completed successfully"})
         mock_eldo.assert_called_once()
 
-    @patch("daemon.workboard")
+    @patch("daemon.workboard", new_callable=AsyncMock)
     def test_workboard_endpoint(self, mock_workboard):
         mock_workboard.return_value = "WorkBoard status ok"
         resp = self.test_client.post("/workboard", json={"action": "status", "workboard_name": "default"})

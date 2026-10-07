@@ -132,6 +132,127 @@ class TestWorkBoardClient(unittest.TestCase):
         self.assertIn("Commit History ('netlists/inv.cir')", hist_res)
         self.assertIn("WorkBoard Add: ~/Desktop/eldo/inv.cir -> netlists/inv.cir", hist_res)
 
+class TestWorkBoardWorkspaceRoot(unittest.TestCase):
+    """Issue #63: WorkBoards must live in the active project workspace, not the EDA_MCP repo."""
+    def setUp(self):
+        self.server_default = tempfile.mkdtemp(prefix="test_wb_server_")
+        self.project = tempfile.mkdtemp(prefix="test_wb_project_")
+        self.scp = MockSCPClient()
+        self.client = WorkBoardClient(scp_client=self.scp, base_workboard_dir=self.server_default)
+
+    def tearDown(self):
+        shutil.rmtree(self.server_default, ignore_errors=True)
+        shutil.rmtree(self.project, ignore_errors=True)
+
+    def test_project_root_maps_to_workboard_subdir(self):
+        boards = self.client.set_workspace_root(self.project)
+        self.assertEqual(boards, os.path.join(self.project, "workboard"))
+
+    def test_path_named_workboard_used_as_is(self):
+        wb = os.path.join(self.project, "workboard")
+        self.assertEqual(WorkBoardClient.resolve_boards_dir(wb), wb)
+        self.assertEqual(WorkBoardClient.resolve_boards_dir(wb + "/"), wb)
+
+    def test_add_lands_in_project_workspace(self):
+        self.client.set_workspace_root(self.project)
+        res = self.client.add(remote_path="~/Desktop/eldo/inv.cir", local_path="inv.cir", workboard_name="inv_tb")
+        expected = os.path.join(self.project, "workboard", "inv_tb", "inv.cir")
+        self.assertTrue(os.path.exists(expected))
+        self.assertIn(f"Local file: {expected}", res)
+        self.assertFalse(os.path.exists(os.path.join(self.server_default, "inv_tb")))
+
+    def test_status_reports_root_and_source(self):
+        self.client.set_workspace_root(self.project, source="workspace_root argument")
+        self.client.initialize(workboard_name="inv_tb")
+        res = self.client.status(workboard_name="inv_tb")
+        self.assertIn(os.path.join(self.project, "workboard", "inv_tb"), res)
+        self.assertIn("Root Source: workspace_root argument", res)
+
+    def test_root_change_clears_active_workboard(self):
+        self.client.initialize(workboard_name="old_board")
+        self.assertEqual(self.client.active_workboard, "old_board")
+        self.client.set_workspace_root(self.project)
+        self.assertIsNone(self.client.active_workboard)
+
+    def test_same_root_keeps_active_workboard(self):
+        self.client.set_workspace_root(self.project)
+        self.client.initialize(workboard_name="b1")
+        self.client.set_workspace_root(self.project)
+        self.assertEqual(self.client.active_workboard, "b1")
+
+    def test_diff_forwards_timeout(self):
+        seen = {}
+        orig = self.scp.read_bytes
+        def spy(remote_path, timeout=30.0):
+            seen["timeout"] = timeout
+            return orig(remote_path, timeout)
+        self.scp.read_bytes = spy
+        self.client.add(remote_path="~/Desktop/eldo/inv.cir", local_path="inv.cir", workboard_name="inv_tb")
+        self.client.diff(local_path="inv.cir", workboard_name="inv_tb", timeout=240.0)
+        self.assertEqual(seen["timeout"], 240.0)
+
+
+class TestServerWorkBoardRootResolution(unittest.IsolatedAsyncioTestCase):
+    """Precedence: workspace_root arg (sticky) > WORKBOARD_ROOT env > client roots > server default."""
+    def setUp(self):
+        import src.server as server
+        self.server = server
+        self.project = tempfile.mkdtemp(prefix="test_wb_proj_")
+        self.other = tempfile.mkdtemp(prefix="test_wb_env_")
+        self._saved = (server._workboard_explicit_root, server.workboard_client.base_workboard_dir,
+                       os.environ.pop("WORKBOARD_ROOT", None))
+        server._workboard_explicit_root = ""
+
+    def tearDown(self):
+        root, base, env = self._saved
+        self.server._workboard_explicit_root = root
+        self.server.workboard_client.base_workboard_dir = base
+        if env is None:
+            os.environ.pop("WORKBOARD_ROOT", None)
+        else:
+            os.environ["WORKBOARD_ROOT"] = env
+        shutil.rmtree(self.project, ignore_errors=True)
+        shutil.rmtree(self.other, ignore_errors=True)
+
+    def _ctx_with_roots(self, paths):
+        from types import SimpleNamespace
+        from urllib.parse import quote
+        roots = [SimpleNamespace(uri="file://" + quote(p)) for p in paths]
+        async def list_roots():
+            return SimpleNamespace(roots=roots)
+        session = SimpleNamespace(
+            client_params=SimpleNamespace(capabilities=SimpleNamespace(roots=object())),
+            list_roots=list_roots)
+        return SimpleNamespace(session=session)
+
+    async def test_explicit_arg_is_sticky_and_beats_env(self):
+        os.environ["WORKBOARD_ROOT"] = self.other
+        self.assertEqual(await self.server._resolve_workboard_root(self.project, None), "")
+        self.assertEqual(await self.server._resolve_workboard_root("", None), "")
+        self.assertEqual(self.server.workboard_client.base_workboard_dir, os.path.join(self.project, "workboard"))
+
+    async def test_env_beats_client_roots(self):
+        os.environ["WORKBOARD_ROOT"] = self.other
+        await self.server._resolve_workboard_root("", self._ctx_with_roots([self.project]))
+        self.assertEqual(self.server.workboard_client.base_workboard_dir, os.path.join(self.other, "workboard"))
+
+    async def test_client_roots_used_when_no_arg_or_env(self):
+        spaced = os.path.join(self.project, "my project")
+        os.makedirs(spaced)
+        await self.server._resolve_workboard_root("", self._ctx_with_roots([spaced]))
+        self.assertEqual(self.server.workboard_client.base_workboard_dir, os.path.join(spaced, "workboard"))
+        self.assertEqual(self.server.workboard_client.root_source, "MCP client workspace root")
+
+    async def test_falls_back_to_server_default(self):
+        await self.server._resolve_workboard_root("", None)
+        self.assertEqual(self.server.workboard_client.base_workboard_dir,
+                         os.path.join(self.server.base_dir, "workboard"))
+
+    async def test_missing_workspace_root_rejected(self):
+        res = await self.server._resolve_workboard_root(os.path.join(self.project, "nope"), None)
+        self.assertIn("is not an existing directory", res)
+
+
 class TestSCPClient(unittest.TestCase):
     """Rigorous unit tests for SCPClient configuration, flags, and command generation."""
     def setUp(self):

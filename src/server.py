@@ -5,6 +5,8 @@ import json
 import shlex
 import logging
 import subprocess
+import anyio
+from urllib.parse import urlparse, unquote
 from typing import Any, List, Dict
 from mcp.server.fastmcp import FastMCP, Context
 from src.core.ssh_client import RemoteSession
@@ -254,8 +256,58 @@ def eldo(
         logger.error(f"[TOOL ERROR] eldo (action={action}) failed in {duration:.2f}s: {e}")
         return f"Error in eldo tool: {str(e)}"
 
+# Session-sticky workspace root set via workboard(workspace_root=...); takes precedence over env/client roots.
+_workboard_explicit_root: str = ""
+
+async def _client_workspace_roots(ctx: Context) -> List[str]:
+    """Returns local directories the MCP client advertises as its workspace roots (file:// URIs only)."""
+    try:
+        caps = ctx.session.client_params.capabilities if ctx.session.client_params else None
+        if not caps or caps.roots is None:
+            return []
+        with anyio.fail_after(5):
+            result = await ctx.session.list_roots()
+        paths = []
+        for root in result.roots:
+            uri = urlparse(str(root.uri))
+            if uri.scheme == "file":
+                paths.append(unquote(uri.path))
+        return paths
+    except Exception as e:
+        logger.warning(f"Could not query MCP client workspace roots: {e}")
+        return []
+
+async def _resolve_workboard_root(workspace_root: str, ctx: Context) -> str:
+    """
+    Points workboard_client at the active project's ./workboard/ directory.
+    Precedence: workspace_root arg (sticky) > WORKBOARD_ROOT env > MCP client roots > EDA_MCP/workboard.
+    Returns an error string, or "" on success.
+    """
+    global _workboard_explicit_root
+    if workspace_root.strip():
+        candidate = os.path.abspath(os.path.expanduser(workspace_root.strip()))
+        if not os.path.isdir(candidate):
+            return f"Error: workspace_root '{workspace_root}' is not an existing directory."
+        _workboard_explicit_root = candidate
+        workboard_client.set_workspace_root(candidate, source="workspace_root argument")
+        return ""
+    if _workboard_explicit_root:
+        workboard_client.set_workspace_root(_workboard_explicit_root, source="workspace_root argument (earlier call)")
+        return ""
+    env_root = os.environ.get("WORKBOARD_ROOT", "").strip()
+    if env_root:
+        workboard_client.set_workspace_root(env_root, source="WORKBOARD_ROOT env")
+        return ""
+    if ctx is not None:
+        roots = await _client_workspace_roots(ctx)
+        if roots:
+            workboard_client.set_workspace_root(roots[0], source="MCP client workspace root")
+            return ""
+    workboard_client.set_workspace_root(os.path.join(base_dir, "workboard"), source="server default (EDA_MCP/workboard) - pass workspace_root to use your project")
+    return ""
+
 @mcp.tool()
-def workboard(
+async def workboard(
     action: str = "status",
     workboard_name: str = "",
     remote_path: str = "",
@@ -263,11 +315,20 @@ def workboard(
     message: str = "Agent sync",
     recursive: bool = False,
     overwrite: bool = False,
-    timeout: float = 60.0
+    timeout: float = 180.0,
+    workspace_root: str = "",
+    ctx: Context = None
 ) -> str:
     """
     Git-backed WorkBoard tool for local-remote file synchronization and version control.
-    
+
+    WorkBoards live at '<workspace_root>/workboard/<workboard_name>/'. The workspace root is resolved as:
+      1. 'workspace_root' argument (absolute path to your project; remembered for later calls this session)
+      2. WORKBOARD_ROOT environment variable of the MCP server
+      3. The MCP client's advertised workspace root
+      4. Fallback: the EDA_MCP server repository
+    Every result reports the absolute 'Local Root' / 'Local file' so you can confirm where files landed.
+
     Actions:
       - 'initialize': Create a new local WorkBoard workspace and initialize a local Git repository.
       - 'add': Fetch a file/folder from remote server path and add it to a specific WorkBoard at local_path.
@@ -278,7 +339,16 @@ def workboard(
       - 'status': List all tracked files and their status for a specific WorkBoard.
       - 'history': Display local Git commit history for a specific file or workspace.
     """
-    logger.info(f"[TOOL CALL] workboard: action={action!r}, workboard_name={workboard_name!r}, remote_path={remote_path!r}, local_path={local_path!r}")
+    logger.info(f"[TOOL CALL] workboard: action={action!r}, workboard_name={workboard_name!r}, remote_path={remote_path!r}, local_path={local_path!r}, workspace_root={workspace_root!r}")
+    root_err = await _resolve_workboard_root(workspace_root, ctx)
+    if root_err:
+        return root_err
+    # SCP/git calls block; run them off the event loop so long transfers don't stall the server.
+    return await anyio.to_thread.run_sync(
+        lambda: _workboard_sync(action, workboard_name, remote_path, local_path, message, overwrite, timeout)
+    )
+
+def _workboard_sync(action: str, workboard_name: str, remote_path: str, local_path: str, message: str, overwrite: bool, timeout: float) -> str:
     start_time = time.time()
     try:
         act = action.lower().strip()
@@ -309,7 +379,7 @@ def workboard(
         elif act == "push":
             res = workboard_client.push(local_path=local_path, workboard_name=workboard_name, message=message, timeout=timeout)
         elif act == "diff":
-            res = workboard_client.diff(local_path=local_path, workboard_name=workboard_name)
+            res = workboard_client.diff(local_path=local_path, workboard_name=workboard_name, timeout=timeout)
         elif act == "status":
             res = workboard_client.status(workboard_name=workboard_name)
         elif act in ("history", "log"):

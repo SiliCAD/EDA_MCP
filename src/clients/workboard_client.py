@@ -23,7 +23,33 @@ class WorkBoardClient:
         self.scp_client = scp_client or SCPClient()
         self.base_workboard_dir = os.path.abspath(base_workboard_dir)
         self.active_workboard: Optional[str] = None
+        self.root_source = "server default"
         os.makedirs(self.base_workboard_dir, exist_ok=True)
+
+    @staticmethod
+    def resolve_boards_dir(workspace_root: str) -> str:
+        """
+        Maps a project workspace root to the directory that holds WorkBoards.
+        '<project>' -> '<project>/workboard'; a path already named 'workboard' is used as-is.
+        """
+        root = os.path.abspath(os.path.expanduser(workspace_root.strip()))
+        if os.path.basename(root.rstrip(os.sep)) == "workboard":
+            return root
+        return os.path.join(root, "workboard")
+
+    def set_workspace_root(self, workspace_root: str, source: str = "workspace_root") -> str:
+        """
+        Points the client at '<workspace_root>/workboard/'. Clears the remembered active
+        WorkBoard when the root changes, since board names are only meaningful per root.
+        Returns the resolved boards directory.
+        """
+        boards_dir = self.resolve_boards_dir(workspace_root)
+        if boards_dir != self.base_workboard_dir:
+            logger.info(f"WorkBoard root changed: {self.base_workboard_dir} -> {boards_dir} (source: {source})")
+            self.base_workboard_dir = boards_dir
+            self.active_workboard = None
+        self.root_source = source
+        return boards_dir
 
     def _list_workboards(self) -> List[str]:
         """Lists all existing local WorkBoard names in base_workboard_dir."""
@@ -211,6 +237,7 @@ class WorkBoardClient:
 
             return (
                 f"Successfully added '{remote_path}' to WorkBoard '{wb_name}' at '{rel_local}'.\n"
+                f"Local file: {target_local_path}\n"
                 f"Synced at local Git commit {commit_sha} ({now_iso}). Checksum: {checksum[:8]}."
             )
         except Exception as e:
@@ -267,6 +294,7 @@ class WorkBoardClient:
 
             return (
                 f"Successfully exported '{rel_local}' to remote '{target_remote}' in WorkBoard '{wb_name}'.\n"
+                f"Local file: {target_local_path}\n"
                 f"Synced at local Git commit {commit_sha} ({now_iso}). Checksum: {checksum[:8]}."
             )
         except Exception as e:
@@ -314,6 +342,7 @@ class WorkBoardClient:
 
             return (
                 f"Successfully pulled latest '{remote_path}' to '{rel_local}' in WorkBoard '{wb_name}'.\n"
+                f"Local file: {target_local_path}\n"
                 f"Advanced sync baseline to commit {commit_sha} ({now_iso})."
             )
         except Exception as e:
@@ -365,6 +394,7 @@ class WorkBoardClient:
 
             return (
                 f"Successfully pushed '{rel_local}' to remote '{remote_dest}'.\n"
+                f"Local file: {target_local_path}\n"
                 f"Committed locally and advanced sync baseline to commit {commit_sha} ({now_iso})."
             )
         except Exception as e:
@@ -453,7 +483,7 @@ class WorkBoardClient:
         if err:
             existing = self._list_workboards()
             if len(existing) > 1 and not workboard_name.strip():
-                output = [f"Multiple WorkBoards exist ({len(existing)} found):"]
+                output = [f"Multiple WorkBoards exist ({len(existing)} found) under {self.base_workboard_dir} (source: {self.root_source}):"]
                 for wb in existing:
                     wb_dir = self._get_workboard_dir(wb)
                     registry = self._load_registry(wb_dir, wb)
@@ -478,6 +508,7 @@ class WorkBoardClient:
         output = []
         output.append(f"WorkBoard Name: {wb_name}")
         output.append(f"Local Root: {wb_dir}")
+        output.append(f"Root Source: {self.root_source}")
         output.append(f"Active Memory State: {'(Active)' if self.active_workboard == wb_name else ''}")
         output.append(f"Last Registry Sync: {registry.get('last_synced', 'Never')}")
         
