@@ -11,6 +11,7 @@ from typing import Any, List, Dict
 from mcp.server.fastmcp import FastMCP, Context
 from src.core.ssh_client import RemoteSession
 from src.core.scp_client import SCPClient
+from src.core.command_guard import CommandGuard
 from src.clients.virtuoso_client import VirtuosoClient
 from src.clients.eldo_client import EldoClient
 from src.clients.workboard_client import WorkBoardClient
@@ -67,6 +68,22 @@ virtuoso_client = VirtuosoClient(session=virtuoso_session)
 virtuoso_standalone_client = VirtuosoClient(session=virtuoso_standalone_session)
 eldo_client = EldoClient(session=eldo_session)
 workboard_client = WorkBoardClient(base_workboard_dir=os.path.join(base_dir, "workboard"))
+command_guard = CommandGuard.from_config(
+    config_path=os.path.join(config_dir, "command_guard.json"),
+    audit_log_path=os.path.join(logs_dir, "remote_commands_audit.jsonl"),
+)
+logger.info(f"Command guard {'enabled' if command_guard.enabled else 'DISABLED'}; allowed dirs: {command_guard.allowed_dirs}")
+
+def _guard_command(tool: str, command: str, cwd: str = None, dry_run: bool = False) -> str:
+    """Runs CommandGuard on a shell command. Returns an error/dry-run message to return instead of executing, or ""."""
+    ok, reason = command_guard.validate(command, cwd=cwd)
+    command_guard.audit(tool, command, ok, reason, dry_run=dry_run)
+    if not ok:
+        logger.warning(f"[COMMAND GUARD] {tool} blocked: {command!r} -> {reason}")
+        return command_guard.blocked_message(reason)
+    if dry_run:
+        return f"[DRY RUN] Command was NOT executed.\nCommand: {command}\nGuard verdict: {reason} (would run)."
+    return ""
 
 def _format_result_summary(res: str, max_len: int = 300) -> str:
     """Formats tool return result on a single line for clean, full lifecycle logging."""
@@ -79,7 +96,7 @@ def _format_result_summary(res: str, max_len: int = 300) -> str:
     return clean
 
 @mcp.tool()
-def remote_control(action: str, command: str = "", path: str = "", content: str = "", timeout: float = 60.0) -> str:
+def remote_control(action: str, command: str = "", path: str = "", content: str = "", timeout: float = 60.0, dry_run: bool = False) -> str:
     """
     Execute shell commands and perform file operations on the remote EDA server.
     
@@ -89,8 +106,12 @@ def remote_control(action: str, command: str = "", path: str = "", content: str 
         path: Remote file path when action='read_file' or action='write_file'
         content: Text content to write when action='write_file'
         timeout: Maximum wait time in seconds for execution (default: 60.0)
+        dry_run: If True, only report whether the command guard would allow 'run_command'/'write_file' (nothing is executed)
+
+    Safety guard: destructive commands (rm, mv, chmod, redirects, ...) may only target paths inside the
+    allowed directories (default ~/Desktop/cmos65, ~/Desktop/eldo, /tmp); mkfs/dd/shutdown etc. are always blocked.
     """
-    logger.info(f"[TOOL CALL] remote_control: action={action!r}, command={command!r}, path={path!r}, content_len={len(content)}, timeout={timeout}")
+    logger.info(f"[TOOL CALL] remote_control: action={action!r}, command={command!r}, path={path!r}, content_len={len(content)}, timeout={timeout}, dry_run={dry_run}")
     start_time = time.time()
     act = action.lower().strip()
     
@@ -98,6 +119,9 @@ def remote_control(action: str, command: str = "", path: str = "", content: str 
         if act in ("run_command", "run_remote_command", "run", "exec", "execute"):
             if not command.strip():
                 return "Error: 'command' argument is required when action='run_command'."
+            guard_msg = _guard_command("remote_control", command, dry_run=dry_run)
+            if guard_msg:
+                return guard_msg
             exit_code, stdout, stderr = remote_session.execute_command(command, timeout=timeout)
             output = []
             output.append(f"Exit Status: {exit_code}")
@@ -115,6 +139,12 @@ def remote_control(action: str, command: str = "", path: str = "", content: str 
         elif act in ("write_file", "write_remote_file", "write"):
             if not path.strip():
                 return "Error: 'path' argument is required when action='write_file'."
+            ok, reason = command_guard.check_write_path(path)
+            command_guard.audit("remote_control.write_file", path, ok, reason, dry_run=dry_run)
+            if not ok:
+                return command_guard.blocked_message(reason)
+            if dry_run:
+                return f"[DRY RUN] write_file to '{path}' was NOT executed. Guard verdict: {reason} (would write {len(content)} bytes)."
             write_res = remote_session.write_file(path, content, timeout=timeout)
             res = write_res or f"Successfully wrote {len(content)} bytes to remote file '{path}'."
             
@@ -160,7 +190,8 @@ def virtuoso(action: str, command: str = "", work_dir: str = "~/Desktop/cmos65",
             if not command.strip():
                 res = "Error: 'command' argument is required when action='run_terminal_command'."
             else:
-                res = virtuoso_client.run_terminal_command(command=command, work_dir=work_dir, timeout=timeout)
+                res = _guard_command("virtuoso", command, cwd=work_dir) or \
+                    virtuoso_client.run_terminal_command(command=command, work_dir=work_dir, timeout=timeout)
         elif act == "exit":
             res = virtuoso_client.exit()
         else:
@@ -244,7 +275,8 @@ def eldo(
             if not command.strip():
                 res = "Error: 'command' argument is required when action='run_terminal_command'."
             else:
-                res = eldo_client.run_terminal_command(command=command, work_dir=work_dir, timeout=timeout)
+                res = _guard_command("eldo", command, cwd=work_dir or eldo_client.workdir or "~/Desktop/eldo") or \
+                    eldo_client.run_terminal_command(command=command, work_dir=work_dir, timeout=timeout)
         else:
             res = f"Error: Unknown action '{action}'. Valid actions are 'visualize_waveforms', 'start_interactive', 'run_interactive', 'stop_interactive', 'run_script', 'run_terminal_command'."
         
