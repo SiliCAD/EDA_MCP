@@ -2,7 +2,8 @@ name: WorkBoard CI Tests
 
 on:
   pull_request:
-    branches: [ main ]
+    # Any base branch, so stacked PRs (based on another feature branch) are tested too.
+    branches: [ '**' ]
 
 permissions:
   contents: read
