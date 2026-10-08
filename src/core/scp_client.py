@@ -1,4 +1,5 @@
 import os
+import re
 import json
 import logging
 import tempfile
@@ -6,6 +7,25 @@ import subprocess
 from typing import Optional, List
 
 logger = logging.getLogger("eda_mcp.scp_client")
+
+# scp -O hands the remote path to the remote login shell, so shell metacharacters there would execute.
+# Only plain path characters are accepted.
+SAFE_REMOTE_PATH = re.compile(r"^[A-Za-z0-9_./~+=,@%:-]+$")
+
+def validate_remote_path(remote_path: str) -> str:
+    """Returns the stripped remote path, or raises ValueError if it could be interpreted by the remote shell."""
+    path = remote_path.strip()
+    if not path:
+        raise ValueError("Remote path is empty.")
+    if path.startswith("-"):
+        raise ValueError(f"Remote path '{path}' must not start with '-'.")
+    if not SAFE_REMOTE_PATH.match(path):
+        bad = sorted({ch for ch in path if not SAFE_REMOTE_PATH.match(ch)})
+        raise ValueError(
+            f"Remote path '{path}' contains characters the remote shell would interpret ({' '.join(repr(c) for c in bad)}). "
+            f"Use only letters, digits and _ . / ~ + = , @ % : - (no spaces, wildcards, quotes or ; | & $)."
+        )
+    return path
 
 class SCPClient:
     """
@@ -68,7 +88,15 @@ class SCPClient:
 
     def _get_base_scp_cmd(self) -> List[str]:
         """Constructs base SCP command options."""
-        cmd = ["scp", "-O", "-q", "-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=no"]
+        # accept-new trusts a host on first contact but refuses a CHANGED host key (possible spoofing).
+        cmd = ["scp", "-O", "-q", "-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=accept-new"]
+
+        # Reuse one SSH connection for consecutive transfers instead of a full handshake per file.
+        ssh_dir = os.path.expanduser("~/.ssh")
+        if os.path.isdir(ssh_dir):
+            cmd.extend(["-o", "ControlMaster=auto",
+                        "-o", f"ControlPath={os.path.join(ssh_dir, 'eda_mcp_cm_%C')}",
+                        "-o", "ControlPersist=10m"])
         
         # Pass explicit SSH config file path if specified or available (~/.ssh/config)
         cfg_path = self.ssh_config_path or "~/.ssh/config"
@@ -92,7 +120,7 @@ class SCPClient:
 
         os.makedirs(os.path.dirname(os.path.abspath(local_path)), exist_ok=True)
 
-        remote_target = remote_path.strip()
+        remote_target = validate_remote_path(remote_path)
         quoted_remote = f"{self.user}@{self.host}:{remote_target}" if self.user else f"{self.host}:{remote_target}"
 
         cmd = self._get_base_scp_cmd() + ["-r", quoted_remote, local_path]
@@ -117,7 +145,7 @@ class SCPClient:
         if not os.path.exists(local_path):
             raise FileNotFoundError(f"Local path does not exist for SCP upload: {local_path}")
 
-        remote_target = remote_path.strip()
+        remote_target = validate_remote_path(remote_path)
         quoted_remote = f"{self.user}@{self.host}:{remote_target}" if self.user else f"{self.host}:{remote_target}"
 
         cmd = self._get_base_scp_cmd() + ["-r", local_path, quoted_remote]
