@@ -67,7 +67,7 @@ async def api_workboard(p: ToolPayload):
         workboard_name=p.workboard_name,
         message=p.message,
         overwrite=p.overwrite,
-        timeout=p.timeout,
+        timeout=p.timeout if "timeout" in p.model_fields_set else 180.0,  # match the MCP tool default
         workspace_root=p.workspace_root or ""
     )
     return {"result": res}
