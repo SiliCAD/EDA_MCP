@@ -137,14 +137,12 @@ class TestSCPHardening(unittest.TestCase):
                     scp.upload(tmp.name, "/tmp/$(id)")
             run.assert_not_called()
 
-    def test_host_key_and_connection_sharing_options(self):
+    def test_host_key_option_and_no_control_path_override(self):
         cmd = SCPClient(config_path="/nonexistent", host="eda-uni")._get_base_scp_cmd()
         self.assertIn("StrictHostKeyChecking=accept-new", cmd)
         self.assertNotIn("StrictHostKeyChecking=no", cmd)
-        if os.path.isdir(os.path.expanduser("~/.ssh")):
-            self.assertIn("ControlMaster=auto", cmd)
-            self.assertIn("ControlPersist=10m", cmd)
-            self.assertTrue(any(o.startswith("ControlPath=") and o.endswith("eda_mcp_cm_%C") for o in cmd))
+        # scp forces ControlMaster=no, so it must keep the user's ControlPath to reuse an existing master.
+        self.assertFalse(any(o.startswith(("ControlPath=", "ControlMaster=")) for o in cmd))
 
 
 if __name__ == "__main__":

@@ -90,13 +90,9 @@ class SCPClient:
         """Constructs base SCP command options."""
         # accept-new trusts a host on first contact but refuses a CHANGED host key (possible spoofing).
         cmd = ["scp", "-O", "-q", "-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=accept-new"]
-
-        # Reuse one SSH connection for consecutive transfers instead of a full handshake per file.
-        ssh_dir = os.path.expanduser("~/.ssh")
-        if os.path.isdir(ssh_dir):
-            cmd.extend(["-o", "ControlMaster=auto",
-                        "-o", f"ControlPath={os.path.join(ssh_dir, 'eda_mcp_cm_%C')}",
-                        "-o", "ControlPersist=10m"])
+        # No ControlMaster/ControlPath here: scp runs ssh with -oControlMaster=no, so it can only REUSE a master
+        # opened elsewhere (the persistent remote_control ssh session via the user's ~/.ssh/config). Overriding
+        # ControlPath would point scp at a socket that never exists and force a full handshake per transfer.
         
         # Pass explicit SSH config file path if specified or available (~/.ssh/config)
         cfg_path = self.ssh_config_path or "~/.ssh/config"
