@@ -35,11 +35,15 @@ Executes OpenSSH legacy SCP protocol (`scp -O`) to bypass terminal escaping and 
 
 ```python
 cmd = [
-  "scp", "-O", "-q", "-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=no",
+  "scp", "-O", "-q", "-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=accept-new",
+  "-o", "ControlMaster=auto", "-o", "ControlPath=~/.ssh/eda_mcp_cm_%C", "-o", "ControlPersist=10m",
   "-F", os.path.expanduser(self.ssh_config_path or "~/.ssh/config"),
   "-r", source_path, destination_path
 ]
 ```
+- `accept-new`: trusts a host on first contact, refuses a changed host key (was `no`, which accepted spoofed hosts).
+- `ControlMaster`: consecutive transfers reuse one SSH connection for 10 min instead of a full handshake per file (independent of the user's own `~/.ssh/config`).
+- **Remote path validation** (`validate_remote_path`): with `-O` the remote path is passed to the remote login shell, so paths are restricted to `[A-Za-z0-9_./~+=,@%:-]` and may not start with `-`. Anything else (spaces, `;`, `$`, quotes, wildcards) raises `ValueError` before `scp` runs.
 - Download: `download(remote_path, local_path)`
 - Upload: `upload(local_path, remote_path)`
 - Byte Stream: `read_bytes()` / `write_bytes()` via `tempfile.NamedTemporaryFile`

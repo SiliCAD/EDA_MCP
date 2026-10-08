@@ -39,3 +39,8 @@ jobs:
       run: |
         python -m unittest discover -s tests -p "test_command_guard.py"
         python -m unittest discover -s tests -p "test_command_guard_server.py"
+
+    - name: Run WorkBoard Hardening Tests (concurrency, git, SCP)
+      run: |
+        python -m unittest discover -s tests -p "test_workboard_hardening.py"
+        python -m unittest discover -s tests -p "test_workboard_concurrency.py"

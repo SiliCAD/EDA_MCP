@@ -40,6 +40,12 @@ workboard(action="export", workboard_name="inverter_sim",
           local_path="tb_inverter.cir", remote_path="~/Desktop/eldo/tb_inverter.cir")
 ```
 
+### Remote Path Rules
+- Remote paths may only contain letters, digits and `_ . / ~ + = , @ % : -` (no spaces, wildcards, quotes, `;`, `|`, `&`, `$`) and must not start with `-`. Other paths are rejected before any transfer.
+- `export` and `push` destinations must be inside the command guard's allowed directories (default `~/Desktop/cmos65`, `~/Desktop/eldo`, `/tmp`). Files you `add` from elsewhere (e.g. `/modelfile_65nm/*.cir`) can be read and pulled but not pushed back.
+- Parallel `workboard` calls are safe: they run one at a time on the server, so issuing several `add`/`pull` calls at once is fine (they simply queue).
+- If a transfer fails or times out, the previous local copy is kept unchanged.
+
 When more than one WorkBoard exists, pass `workboard_name` on every operation unless the current server session has already selected one. That selection is session-local; do not assume it persists across MCP server restarts.
 
 ---
