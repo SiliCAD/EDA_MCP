@@ -5,6 +5,7 @@ import logging
 import subprocess
 import time
 import difflib
+import shutil
 from typing import Dict, Any, Optional, Tuple, List
 from src.core.scp_client import SCPClient
 
@@ -143,6 +144,55 @@ class WorkBoardClient:
             return stdout.strip()
         return "UNKNOWN"
 
+    def _git_checked(self, workboard_dir: str, args: List[str]) -> str:
+        """Runs git and raises RuntimeError on failure. A commit with nothing to commit is not a failure."""
+        ret, stdout, stderr = self._git_cmd(workboard_dir, args)
+        if ret != 0:
+            out = (stdout + stderr).strip()
+            if args and args[0] == "commit" and ("nothing to commit" in out or "no changes added" in out):
+                return out
+            raise RuntimeError(f"git {' '.join(args[:2])} failed in {workboard_dir}: {out or f'exit {ret}'}")
+        return stdout
+
+    def _commit_file(self, workboard_dir: str, rel_local: str, message: str) -> str:
+        """Commits one synced file and returns the commit SHA that contains it (HEAD if unchanged)."""
+        self._git_checked(workboard_dir, ["add", "-f", "--", rel_local])
+        self._git_checked(workboard_dir, ["commit", "-m", message])
+        sha = self._get_current_head_commit(workboard_dir)
+        if sha == "UNKNOWN":
+            raise RuntimeError(f"git commit produced no HEAD in {workboard_dir}")
+        return sha
+
+    def _commit_registry(self, workboard_dir: str, registry: Dict[str, Any], message: str):
+        """
+        Saves .workboard.json and commits it separately. The file commit recorded in the registry is
+        never rewritten (no --amend), so last_sync_commit always points at a commit on the branch.
+        """
+        self._save_registry(workboard_dir, registry)
+        self._git_checked(workboard_dir, ["add", "-f", ".workboard.json"])
+        self._git_checked(workboard_dir, ["commit", "-m", message])
+
+    def _download_atomic(self, remote_path: str, target_local_path: str, timeout: float):
+        """
+        Downloads to a temporary sibling path and swaps it into place only on success, so a failed or
+        timed-out transfer never leaves the existing local copy truncated.
+        """
+        tmp_path = f"{target_local_path}.wbtmp-{os.getpid()}"
+        if os.path.isdir(tmp_path):
+            shutil.rmtree(tmp_path, ignore_errors=True)
+        elif os.path.exists(tmp_path):
+            os.remove(tmp_path)
+        try:
+            self.scp_client.download(remote_path, tmp_path, timeout=timeout)
+            if os.path.isdir(target_local_path) and not os.path.islink(target_local_path):
+                shutil.rmtree(target_local_path)
+            os.replace(tmp_path, target_local_path)
+        finally:
+            if os.path.isdir(tmp_path):
+                shutil.rmtree(tmp_path, ignore_errors=True)
+            elif os.path.exists(tmp_path):
+                os.remove(tmp_path)
+
     def _calculate_checksum(self, filepath: str) -> str:
         """Calculates SHA-256 checksum of a local file."""
         if not os.path.exists(filepath) or os.path.isdir(filepath):
@@ -193,8 +243,8 @@ class WorkBoardClient:
 
         # Commit scaffolding on first init so the board starts with a clean working tree
         if is_new:
-            self._git_cmd(wb_dir, ["add", "-f", ".gitignore", ".workboard.json"])
-            self._git_cmd(wb_dir, ["commit", "-m", f"WorkBoard Initialize: {name}"])
+            self._git_checked(wb_dir, ["add", "-f", ".gitignore", ".workboard.json"])
+            self._git_checked(wb_dir, ["commit", "-m", f"WorkBoard Initialize: {name}"])
 
         return "\n".join(output)
 
@@ -219,15 +269,13 @@ class WorkBoardClient:
         os.makedirs(os.path.dirname(target_local_path), exist_ok=True)
 
         try:
-            self.scp_client.download(remote_path, target_local_path, timeout=timeout)
+            self._download_atomic(remote_path, target_local_path, timeout=timeout)
 
             checksum = self._calculate_checksum(target_local_path)
             now_iso = time.strftime("%Y-%m-%dT%H:%M:%SZ")
 
             # Stage file and initial manifest placeholder
-            self._git_cmd(wb_dir, ["add", "-f", rel_local])
-            self._git_cmd(wb_dir, ["commit", "-m", f"WorkBoard Add: {remote_path} -> {rel_local}"])
-            commit_sha = self._get_current_head_commit(wb_dir)
+            commit_sha = self._commit_file(wb_dir, rel_local, f"WorkBoard Add: {remote_path} -> {rel_local}")
 
             # Update registry manifest with sync commit baseline
             registry["files"][rel_local] = {
@@ -237,9 +285,7 @@ class WorkBoardClient:
                 "last_sync_time": now_iso,
                 "is_directory": os.path.isdir(target_local_path)
             }
-            self._save_registry(wb_dir, registry)
-            self._git_cmd(wb_dir, ["add", "-f", ".workboard.json"])
-            self._git_cmd(wb_dir, ["commit", "--amend", "--no-edit"])
+            self._commit_registry(wb_dir, registry, f"WorkBoard Registry: {rel_local} baseline {commit_sha}")
 
             return (
                 f"Successfully added '{remote_path}' to WorkBoard '{wb_name}' at '{rel_local}'.\n"
@@ -282,9 +328,7 @@ class WorkBoardClient:
             now_iso = time.strftime("%Y-%m-%dT%H:%M:%SZ")
 
             # Stage file and commit locally
-            self._git_cmd(wb_dir, ["add", "-f", rel_local])
-            self._git_cmd(wb_dir, ["commit", "-m", f"WorkBoard Export: {rel_local} -> {target_remote} ({message})"])
-            commit_sha = self._get_current_head_commit(wb_dir)
+            commit_sha = self._commit_file(wb_dir, rel_local, f"WorkBoard Export: {rel_local} -> {target_remote} ({message})")
 
             # Update registry manifest with sync commit baseline
             registry["files"][rel_local] = {
@@ -294,9 +338,7 @@ class WorkBoardClient:
                 "last_sync_time": now_iso,
                 "is_directory": os.path.isdir(target_local_path)
             }
-            self._save_registry(wb_dir, registry)
-            self._git_cmd(wb_dir, ["add", "-f", ".workboard.json"])
-            self._git_cmd(wb_dir, ["commit", "--amend", "--no-edit"])
+            self._commit_registry(wb_dir, registry, f"WorkBoard Registry: {rel_local} baseline {commit_sha}")
 
             return (
                 f"Successfully exported '{rel_local}' to remote '{target_remote}' in WorkBoard '{wb_name}'.\n"
@@ -330,21 +372,17 @@ class WorkBoardClient:
         target_local_path = os.path.join(wb_dir, rel_local)
 
         try:
-            self.scp_client.download(remote_path, target_local_path, timeout=timeout)
+            self._download_atomic(remote_path, target_local_path, timeout=timeout)
 
             checksum = self._calculate_checksum(target_local_path)
             now_iso = time.strftime("%Y-%m-%dT%H:%M:%SZ")
 
-            self._git_cmd(wb_dir, ["add", "-f", rel_local])
-            self._git_cmd(wb_dir, ["commit", "-m", f"WorkBoard Pull Update: {rel_local}"])
-            commit_sha = self._get_current_head_commit(wb_dir)
+            commit_sha = self._commit_file(wb_dir, rel_local, f"WorkBoard Pull Update: {rel_local}")
 
             registry["files"][rel_local]["local_checksum"] = checksum
             registry["files"][rel_local]["last_sync_commit"] = commit_sha
             registry["files"][rel_local]["last_sync_time"] = now_iso
-            self._save_registry(wb_dir, registry)
-            self._git_cmd(wb_dir, ["add", "-f", ".workboard.json"])
-            self._git_cmd(wb_dir, ["commit", "--amend", "--no-edit"])
+            self._commit_registry(wb_dir, registry, f"WorkBoard Registry: {rel_local} baseline {commit_sha}")
 
             return (
                 f"Successfully pulled latest '{remote_path}' to '{rel_local}' in WorkBoard '{wb_name}'.\n"
@@ -387,16 +425,12 @@ class WorkBoardClient:
             checksum = self._calculate_checksum(target_local_path)
             now_iso = time.strftime("%Y-%m-%dT%H:%M:%SZ")
 
-            self._git_cmd(wb_dir, ["add", "-f", rel_local])
-            self._git_cmd(wb_dir, ["commit", "-m", f"WorkBoard Push: {rel_local} -> {remote_dest} ({message})"])
-            commit_sha = self._get_current_head_commit(wb_dir)
+            commit_sha = self._commit_file(wb_dir, rel_local, f"WorkBoard Push: {rel_local} -> {remote_dest} ({message})")
 
             registry["files"][rel_local]["local_checksum"] = checksum
             registry["files"][rel_local]["last_sync_commit"] = commit_sha
             registry["files"][rel_local]["last_sync_time"] = now_iso
-            self._save_registry(wb_dir, registry)
-            self._git_cmd(wb_dir, ["add", "-f", ".workboard.json"])
-            self._git_cmd(wb_dir, ["commit", "--amend", "--no-edit"])
+            self._commit_registry(wb_dir, registry, f"WorkBoard Registry: {rel_local} baseline {commit_sha}")
 
             return (
                 f"Successfully pushed '{rel_local}' to remote '{remote_dest}'.\n"
@@ -444,9 +478,7 @@ class WorkBoardClient:
                     registry["files"][rel_local]["last_sync_commit"] = current_head
                     registry["files"][rel_local]["last_sync_time"] = now_iso
                     registry["files"][rel_local]["local_checksum"] = self._calculate_checksum(target_local_path)
-                    self._save_registry(wb_dir, registry)
-                    self._git_cmd(wb_dir, ["add", "-f", ".workboard.json"])
-                    self._git_cmd(wb_dir, ["commit", "-m", f"WorkBoard Diff: Verified sync baseline for {rel_local} at {current_head}"])
+                    self._commit_registry(wb_dir, registry, f"WorkBoard Diff: Verified sync baseline for {rel_local} at {current_head}")
 
                     return (
                         f"✓ No diff detected for '{rel_local}'. Local and live remote server files are IDENTICAL.\n"
