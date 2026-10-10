@@ -10,7 +10,8 @@ from urllib.parse import urlparse, unquote
 from typing import Any, List, Dict
 from mcp.server.fastmcp import FastMCP, Context
 from src.core.ssh_client import RemoteSession
-from src.core.scp_client import SCPClient
+from src.core.scp_client import SCPClient, validate_remote_path
+from src.core.command_guard import CommandGuard
 from src.clients.virtuoso_client import VirtuosoClient
 from src.clients.eldo_client import EldoClient
 from src.clients.workboard_client import WorkBoardClient
@@ -67,6 +68,22 @@ virtuoso_client = VirtuosoClient(session=virtuoso_session)
 virtuoso_standalone_client = VirtuosoClient(session=virtuoso_standalone_session)
 eldo_client = EldoClient(session=eldo_session)
 workboard_client = WorkBoardClient(base_workboard_dir=os.path.join(base_dir, "workboard"))
+command_guard = CommandGuard.from_config(
+    config_path=os.path.join(config_dir, "command_guard.json"),
+    audit_log_path=os.path.join(logs_dir, "remote_commands_audit.jsonl"),
+)
+logger.info(f"Command guard {'enabled' if command_guard.enabled else 'DISABLED'}; allowed dirs: {command_guard.allowed_dirs}")
+
+def _guard_command(tool: str, command: str, cwd: str = None, dry_run: bool = False) -> str:
+    """Runs CommandGuard on a shell command. Returns an error/dry-run message to return instead of executing, or ""."""
+    ok, reason = command_guard.validate(command, cwd=cwd)
+    command_guard.audit(tool, command, ok, reason, dry_run=dry_run)
+    if not ok:
+        logger.warning(f"[COMMAND GUARD] {tool} blocked: {command!r} -> {reason}")
+        return command_guard.blocked_message(reason)
+    if dry_run:
+        return f"[DRY RUN] Command was NOT executed.\nCommand: {command}\nGuard verdict: {reason} (would run)."
+    return ""
 
 def _format_result_summary(res: str, max_len: int = 300) -> str:
     """Formats tool return result on a single line for clean, full lifecycle logging."""
@@ -79,7 +96,7 @@ def _format_result_summary(res: str, max_len: int = 300) -> str:
     return clean
 
 @mcp.tool()
-def remote_control(action: str, command: str = "", path: str = "", content: str = "", timeout: float = 60.0) -> str:
+def remote_control(action: str, command: str = "", path: str = "", content: str = "", timeout: float = 60.0, dry_run: bool = False) -> str:
     """
     Execute shell commands and perform file operations on the remote EDA server.
     
@@ -89,8 +106,12 @@ def remote_control(action: str, command: str = "", path: str = "", content: str 
         path: Remote file path when action='read_file' or action='write_file'
         content: Text content to write when action='write_file'
         timeout: Maximum wait time in seconds for execution (default: 60.0)
+        dry_run: If True, only report whether the command guard would allow 'run_command'/'write_file' (nothing is executed)
+
+    Safety guard: destructive commands (rm, mv, chmod, redirects, ...) may only target paths inside the
+    allowed directories (default ~/Desktop/cmos65, ~/Desktop/eldo, /tmp); mkfs/dd/shutdown etc. are always blocked.
     """
-    logger.info(f"[TOOL CALL] remote_control: action={action!r}, command={command!r}, path={path!r}, content_len={len(content)}, timeout={timeout}")
+    logger.info(f"[TOOL CALL] remote_control: action={action!r}, command={command!r}, path={path!r}, content_len={len(content)}, timeout={timeout}, dry_run={dry_run}")
     start_time = time.time()
     act = action.lower().strip()
     
@@ -98,6 +119,9 @@ def remote_control(action: str, command: str = "", path: str = "", content: str 
         if act in ("run_command", "run_remote_command", "run", "exec", "execute"):
             if not command.strip():
                 return "Error: 'command' argument is required when action='run_command'."
+            guard_msg = _guard_command("remote_control", command, dry_run=dry_run)
+            if guard_msg:
+                return guard_msg
             exit_code, stdout, stderr = remote_session.execute_command(command, timeout=timeout)
             output = []
             output.append(f"Exit Status: {exit_code}")
@@ -115,6 +139,12 @@ def remote_control(action: str, command: str = "", path: str = "", content: str 
         elif act in ("write_file", "write_remote_file", "write"):
             if not path.strip():
                 return "Error: 'path' argument is required when action='write_file'."
+            ok, reason = command_guard.check_write_path(path)
+            command_guard.audit("remote_control.write_file", path, ok, reason, dry_run=dry_run)
+            if not ok:
+                return command_guard.blocked_message(reason)
+            if dry_run:
+                return f"[DRY RUN] write_file to '{path}' was NOT executed. Guard verdict: {reason} (would write {len(content)} bytes)."
             write_res = remote_session.write_file(path, content, timeout=timeout)
             res = write_res or f"Successfully wrote {len(content)} bytes to remote file '{path}'."
             
@@ -160,7 +190,8 @@ def virtuoso(action: str, command: str = "", work_dir: str = "~/Desktop/cmos65",
             if not command.strip():
                 res = "Error: 'command' argument is required when action='run_terminal_command'."
             else:
-                res = virtuoso_client.run_terminal_command(command=command, work_dir=work_dir, timeout=timeout)
+                res = _guard_command("virtuoso", command, cwd=work_dir) or \
+                    virtuoso_client.run_terminal_command(command=command, work_dir=work_dir, timeout=timeout)
         elif act == "exit":
             res = virtuoso_client.exit()
         else:
@@ -244,7 +275,8 @@ def eldo(
             if not command.strip():
                 res = "Error: 'command' argument is required when action='run_terminal_command'."
             else:
-                res = eldo_client.run_terminal_command(command=command, work_dir=work_dir, timeout=timeout)
+                res = _guard_command("eldo", command, cwd=work_dir or eldo_client.workdir or "~/Desktop/eldo") or \
+                    eldo_client.run_terminal_command(command=command, work_dir=work_dir, timeout=timeout)
         else:
             res = f"Error: Unknown action '{action}'. Valid actions are 'visualize_waveforms', 'start_interactive', 'run_interactive', 'stop_interactive', 'run_script', 'run_terminal_command'."
         
@@ -258,6 +290,8 @@ def eldo(
 
 # Session-sticky workspace root set via workboard(workspace_root=...); takes precedence over env/client roots.
 _workboard_explicit_root: str = ""
+# WorkBoard calls share .workboard.json, the board's git repo and the remote SSH session, so they run one at a time.
+_workboard_lock = anyio.Lock()
 
 async def _client_workspace_roots(ctx: Context) -> List[str]:
     """Returns local directories the MCP client advertises as its workspace roots (file:// URIs only)."""
@@ -270,7 +304,7 @@ async def _client_workspace_roots(ctx: Context) -> List[str]:
         paths = []
         for root in result.roots:
             uri = urlparse(str(root.uri))
-            if uri.scheme == "file":
+            if uri.scheme == "file" and os.path.isdir(unquote(uri.path)):
                 paths.append(unquote(uri.path))
         return paths
     except Exception as e:
@@ -296,6 +330,8 @@ async def _resolve_workboard_root(workspace_root: str, ctx: Context) -> str:
         return ""
     env_root = os.environ.get("WORKBOARD_ROOT", "").strip()
     if env_root:
+        if not os.path.isdir(os.path.expanduser(env_root)):
+            return f"Error: WORKBOARD_ROOT '{env_root}' is not an existing directory. Fix the MCP server environment or pass workspace_root."
         workboard_client.set_workspace_root(env_root, source="WORKBOARD_ROOT env")
         return ""
     if ctx is not None:
@@ -340,13 +376,57 @@ async def workboard(
       - 'history': Display local Git commit history for a specific file or workspace.
     """
     logger.info(f"[TOOL CALL] workboard: action={action!r}, workboard_name={workboard_name!r}, remote_path={remote_path!r}, local_path={local_path!r}, workspace_root={workspace_root!r}")
-    root_err = await _resolve_workboard_root(workspace_root, ctx)
-    if root_err:
-        return root_err
-    # SCP/git calls block; run them off the event loop so long transfers don't stall the server.
-    return await anyio.to_thread.run_sync(
-        lambda: _workboard_sync(action, workboard_name, remote_path, local_path, message, overwrite, timeout)
-    )
+    async with _workboard_lock:
+        root_err = await _resolve_workboard_root(workspace_root, ctx)
+        if root_err:
+            return root_err
+        # Remote checks use the shared remote_control SSH session, so they stay on the event-loop thread
+        # (serialized with the other tools) instead of the worker thread below.
+        preflight_err = _workboard_preflight(action, workboard_name, remote_path, local_path, overwrite, timeout)
+        if preflight_err:
+            return preflight_err
+        # SCP/git calls block; run them off the event loop so long transfers don't stall other tools.
+        return await anyio.to_thread.run_sync(
+            lambda: _workboard_sync(action, workboard_name, remote_path, local_path, message, overwrite, timeout)
+        )
+
+def _workboard_preflight(action: str, workboard_name: str, remote_path: str, local_path: str, overwrite: bool, timeout: float) -> str:
+    """
+    Validates upload destinations before anything is transferred: safe path characters, the command
+    guard's allowed directories, and (for export without overwrite) that the remote file doesn't exist yet.
+    Returns an error string, or "" to proceed.
+    """
+    act = action.lower().strip()
+    if act not in ("export", "export_file", "push"):
+        return ""
+    if not local_path.strip():
+        return f"Error: 'local_path' is required for {act} action."
+
+    wb_name, err = workboard_client._resolve_workboard_name(workboard_name)
+    if err:
+        return err
+    registry = workboard_client._load_registry(workboard_client._get_workboard_dir(wb_name), wb_name)
+    registered = registry.get("files", {}).get(local_path.strip(), {}).get("remote_path", "")
+    target_remote = (remote_path.strip() or registered) if act != "push" else registered
+    if not target_remote:
+        return ""  # the client reports the missing remote_path / unregistered file
+
+    try:
+        target_remote = validate_remote_path(target_remote)
+    except ValueError as e:
+        return f"Error: {e}"
+
+    ok, reason = command_guard.check_write_path(target_remote)
+    command_guard.audit(f"workboard.{act}", target_remote, ok, reason)
+    if not ok:
+        return command_guard.blocked_message(reason)
+
+    if act in ("export", "export_file") and not overwrite:
+        quoted_remote = f"$HOME{shlex.quote(target_remote[1:])}" if target_remote.startswith("~") else shlex.quote(target_remote)
+        exit_code, _, _ = remote_session.execute_command(f"test -e {quoted_remote}", timeout=timeout)
+        if exit_code == 0:
+            return f"Error: File at remote path '{target_remote}' already exists on the server. Set overwrite=True to overwrite it."
+    return ""
 
 def _workboard_sync(action: str, workboard_name: str, remote_path: str, local_path: str, message: str, overwrite: bool, timeout: float) -> str:
     start_time = time.time()
@@ -357,22 +437,6 @@ def _workboard_sync(action: str, workboard_name: str, remote_path: str, local_pa
         elif act in ("add", "add_file"):
             res = workboard_client.add(remote_path=remote_path, local_path=local_path, workboard_name=workboard_name, timeout=timeout)
         elif act in ("export", "export_file"):
-            if not local_path.strip():
-                return "Error: 'local_path' is required for export action."
-
-            # Check if remote file exists using remote_session.execute_command
-            wb_name, _ = workboard_client._resolve_workboard_name(workboard_name)
-            wb_dir = workboard_client._get_workboard_dir(wb_name)
-            registry = workboard_client._load_registry(wb_dir, wb_name)
-            target_remote = remote_path.strip() or registry.get("files", {}).get(local_path.strip(), {}).get("remote_path", "")
-
-            if target_remote and not overwrite:
-                quoted_remote = f"$HOME{shlex.quote(target_remote[1:])}" if target_remote.startswith("~") else shlex.quote(target_remote)
-                check_cmd = f"test -e {quoted_remote}"
-                exit_code, _, _ = remote_session.execute_command(check_cmd, timeout=timeout)
-                if exit_code == 0:
-                    return f"Error: File at remote path '{target_remote}' already exists on the server. Set overwrite=True to overwrite it."
-
             res = workboard_client.export(local_path=local_path, remote_path=remote_path, workboard_name=workboard_name, message=message, timeout=timeout)
         elif act == "pull":
             res = workboard_client.pull(local_path=local_path, workboard_name=workboard_name, timeout=timeout)

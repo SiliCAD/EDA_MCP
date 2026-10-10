@@ -2,7 +2,8 @@ name: WorkBoard CI Tests
 
 on:
   pull_request:
-    branches: [ main ]
+    # Any base branch, so stacked PRs (based on another feature branch) are tested too.
+    branches: [ '**' ]
 
 permissions:
   contents: read
@@ -33,3 +34,13 @@ jobs:
       run: |
         python -m unittest discover -s tests -p "test_workboard_root_resolution.py"
         python -m unittest discover -s tests -p "test_daemon.py"
+
+    - name: Run Command Guard Tests (issue #55)
+      run: |
+        python -m unittest discover -s tests -p "test_command_guard.py"
+        python -m unittest discover -s tests -p "test_command_guard_server.py"
+
+    - name: Run WorkBoard Hardening Tests (concurrency, git, SCP)
+      run: |
+        python -m unittest discover -s tests -p "test_workboard_hardening.py"
+        python -m unittest discover -s tests -p "test_workboard_concurrency.py"

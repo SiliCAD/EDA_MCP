@@ -35,11 +35,14 @@ Executes OpenSSH legacy SCP protocol (`scp -O`) to bypass terminal escaping and 
 
 ```python
 cmd = [
-  "scp", "-O", "-q", "-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=no",
+  "scp", "-O", "-q", "-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=accept-new",
   "-F", os.path.expanduser(self.ssh_config_path or "~/.ssh/config"),
   "-r", source_path, destination_path
 ]
 ```
+- `accept-new`: trusts a host on first contact, refuses a changed host key (was `no`, which accepted spoofed hosts).
+- Connection sharing comes from the user's `~/.ssh/config` (`ControlMaster auto` + `ControlPath` + `ControlPersist`, see README). `scp` itself always runs `ssh -oControlMaster=no`, so it can only **reuse** a master opened by the persistent `remote_control` ssh session; never override `ControlPath` on the scp command line or it will look for a socket that doesn't exist.
+- **Remote path validation** (`validate_remote_path`): with `-O` the remote path is passed to the remote login shell, so paths are restricted to `[A-Za-z0-9_./~+=,@%:-]` and may not start with `-`. Anything else (spaces, `;`, `$`, quotes, wildcards) raises `ValueError` before `scp` runs.
 - Download: `download(remote_path, local_path)`
 - Upload: `upload(local_path, remote_path)`
 - Byte Stream: `read_bytes()` / `write_bytes()` via `tempfile.NamedTemporaryFile`

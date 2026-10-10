@@ -13,8 +13,27 @@ type RemoteControlArgs = {
   path?: string;    // Required for read_file / write_file
   content?: string; // Required for write_file
   timeout?: number; // Default: 60.0s
+  dry_run?: boolean; // Default: false. Report the command-guard verdict for run_command/write_file without executing.
 };
 ```
+
+### Command Guard (safety checks)
+Every agent-supplied shell command (`remote_control` `run_command`, and `virtuoso` / `eldo` `run_terminal_command`) and every `write_file` path is checked BEFORE execution. Blocked commands are never sent to the server and return `Error: Blocked: <reason>` + `The command was NOT executed.`
+
+| Rule | Examples blocked | Allowed |
+| :--- | :--- | :--- |
+| Always blocked | `mkfs`, `dd of=/dev/...`, `shutdown`/`reboot`, `kill -9 1`, `chmod 777`, fork bombs | — |
+| Write/delete targets must be inside allowed dirs (default `~/Desktop/cmos65`, `~/Desktop/eldo`, `/tmp`) | `rm -rf ~`, `echo x > ~/.cshrc`, `mv lib ~/old`, `write_file ~/.cshrc` | `rm -rf ~/Desktop/cmos65/drc_run`, `echo x > /tmp/a.txt` |
+| Never delete an allowed root or match everything in it | `rm -rf ~/Desktop/cmos65`, `rm -rf ~/Desktop/cmos65/*`, `find ~/Desktop/cmos65 -delete` | `rm -f ~/Desktop/eldo/*.chi`, `rm -rf ~/Desktop/cmos65/drc_run/*`, `find ~/Desktop/cmos65 -name '*.cdslck' -delete` |
+| Other file writers are checked too | `sed -i ... ~/.cshrc`, `dd of=~/.cshrc`, `python3 -c "os.remove(...)"` / `perl -e "unlink ..."` | `sed -i ... ~/Desktop/eldo/tb.cir`, `python3 -c "print(1)"` |
+| Targets must be verifiable | `rm -f tb.chi` (relative, unknown cwd), `rm -rf $(pwd)`, `rm -rf $VAR/x`, `ls \| xargs rm` | `cd ~/Desktop/eldo && rm -f tb.chi` |
+
+- Read-only commands (`ls`, `cat`, `grep`, `ps`, tool launches) are never restricted by path.
+- `virtuoso`/`eldo` `run_terminal_command` resolve relative paths against their `work_dir`, so `eldo tb.cir > tb.log` works.
+- Checks also apply inside `bash -c "..."`, `eval`, and chains joined by `;`, `&&`, `||`, newlines.
+- If a block is wrong for your task, do NOT try to rephrase around it; report it to the human user (they can edit `config/command_guard.json`).
+- The guard is a seatbelt against hallucinated commands, not a sandbox: it can't see inside script files (`python3 script.py`, `./run.sh`) or SKILL `system()` calls. Keep destructive work in explicit `rm`/`mv` commands on absolute paths.
+- Use `dry_run=true` to check a command first: returns `[DRY RUN] Command was NOT executed ... Guard verdict: Allowed (would run).`
 
 ### Action Behavior & Return Formats
 - `run_command`: Executes `command` in persistent `csh` session.
