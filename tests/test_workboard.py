@@ -50,6 +50,12 @@ class TestWorkBoardClient(unittest.TestCase):
         self.assertTrue(os.path.exists(os.path.join(wb_dir, ".git")))
         self.assertTrue(os.path.exists(os.path.join(wb_dir, ".workboard.json")))
 
+    def test_initialize_leaves_clean_tree(self):
+        self.client.initialize(workboard_name="inv_tb")
+        wb_dir = os.path.join(self.test_dir, "inv_tb")
+        _, out, _ = self.client._git_cmd(wb_dir, ["status", "--short"])
+        self.assertEqual(out.strip(), "")
+
     def test_export(self):
         self.client.initialize(workboard_name="inv_tb")
         wb_dir = os.path.join(self.test_dir, "inv_tb")
@@ -131,6 +137,66 @@ class TestWorkBoardClient(unittest.TestCase):
         hist_res = self.client.history(local_path="netlists/inv.cir", workboard_name="inv_tb")
         self.assertIn("Commit History ('netlists/inv.cir')", hist_res)
         self.assertIn("WorkBoard Add: ~/Desktop/eldo/inv.cir -> netlists/inv.cir", hist_res)
+
+class TestWorkBoardWorkspaceRoot(unittest.TestCase):
+    """Issue #63: WorkBoards must live in the active project workspace, not the EDA_MCP repo."""
+    def setUp(self):
+        self.server_default = tempfile.mkdtemp(prefix="test_wb_server_")
+        self.project = tempfile.mkdtemp(prefix="test_wb_project_")
+        self.scp = MockSCPClient()
+        self.client = WorkBoardClient(scp_client=self.scp, base_workboard_dir=self.server_default)
+
+    def tearDown(self):
+        shutil.rmtree(self.server_default, ignore_errors=True)
+        shutil.rmtree(self.project, ignore_errors=True)
+
+    def test_project_root_maps_to_workboard_subdir(self):
+        boards = self.client.set_workspace_root(self.project)
+        self.assertEqual(boards, os.path.join(self.project, "workboard"))
+
+    def test_path_named_workboard_used_as_is(self):
+        wb = os.path.join(self.project, "workboard")
+        self.assertEqual(WorkBoardClient.resolve_boards_dir(wb), wb)
+        self.assertEqual(WorkBoardClient.resolve_boards_dir(wb + "/"), wb)
+
+    def test_add_lands_in_project_workspace(self):
+        self.client.set_workspace_root(self.project)
+        res = self.client.add(remote_path="~/Desktop/eldo/inv.cir", local_path="inv.cir", workboard_name="inv_tb")
+        expected = os.path.join(self.project, "workboard", "inv_tb", "inv.cir")
+        self.assertTrue(os.path.exists(expected))
+        self.assertIn(f"Local file: {expected}", res)
+        self.assertFalse(os.path.exists(os.path.join(self.server_default, "inv_tb")))
+
+    def test_status_reports_root_and_source(self):
+        self.client.set_workspace_root(self.project, source="workspace_root argument")
+        self.client.initialize(workboard_name="inv_tb")
+        res = self.client.status(workboard_name="inv_tb")
+        self.assertIn(os.path.join(self.project, "workboard", "inv_tb"), res)
+        self.assertIn("Root Source: workspace_root argument", res)
+
+    def test_root_change_clears_active_workboard(self):
+        self.client.initialize(workboard_name="old_board")
+        self.assertEqual(self.client.active_workboard, "old_board")
+        self.client.set_workspace_root(self.project)
+        self.assertIsNone(self.client.active_workboard)
+
+    def test_same_root_keeps_active_workboard(self):
+        self.client.set_workspace_root(self.project)
+        self.client.initialize(workboard_name="b1")
+        self.client.set_workspace_root(self.project)
+        self.assertEqual(self.client.active_workboard, "b1")
+
+    def test_diff_forwards_timeout(self):
+        seen = {}
+        orig = self.scp.read_bytes
+        def spy(remote_path, timeout=30.0):
+            seen["timeout"] = timeout
+            return orig(remote_path, timeout)
+        self.scp.read_bytes = spy
+        self.client.add(remote_path="~/Desktop/eldo/inv.cir", local_path="inv.cir", workboard_name="inv_tb")
+        self.client.diff(local_path="inv.cir", workboard_name="inv_tb", timeout=240.0)
+        self.assertEqual(seen["timeout"], 240.0)
+
 
 class TestSCPClient(unittest.TestCase):
     """Rigorous unit tests for SCPClient configuration, flags, and command generation."""

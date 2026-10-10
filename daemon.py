@@ -38,6 +38,7 @@ class ToolPayload(BaseModel):
     message: Optional[str] = "Daemon sync"
     overwrite: Optional[bool] = False
     timeout: Optional[float] = 60.0
+    workspace_root: Optional[str] = ""
 
 @app.get("/health")
 def health_check():
@@ -57,16 +58,17 @@ def api_eldo(p: ToolPayload):
     return {"result": res}
 
 @app.post("/workboard")
-def api_workboard(p: ToolPayload):
+async def api_workboard(p: ToolPayload):
     """Executes WorkBoard local-remote workspace synchronization actions."""
-    res = workboard(
+    res = await workboard(
         action=p.action,
         local_path=p.local_path,
         remote_path=p.remote_path,
         workboard_name=p.workboard_name,
         message=p.message,
         overwrite=p.overwrite,
-        timeout=p.timeout
+        timeout=p.timeout if "timeout" in p.model_fields_set else 180.0,  # match the MCP tool default
+        workspace_root=p.workspace_root or ""
     )
     return {"result": res}
 

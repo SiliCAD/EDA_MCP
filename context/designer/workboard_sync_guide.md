@@ -1,14 +1,32 @@
 # WORKBOARD_SYNC_SPEC
 
 ## 1. Local-Remote Workspace Mapping
-- **Local WorkBoard Root**: `./workboard/<workboard_name>/`
-- **Registry File**: `./workboard/<workboard_name>/.workboard.json`
+- **Local WorkBoard Root**: `<workspace_root>/workboard/<workboard_name>/`
+- **Registry File**: `<workspace_root>/workboard/<workboard_name>/.workboard.json`
 - **Sync Baseline**: `last_sync_commit` (SHA of local Git commit at last synchronized state $C_{\text{sync}}$)
+
+### Workspace Root Resolution
+The MCP server runs from its own repository, so `./workboard/` is NOT automatically your project folder. `<workspace_root>` is resolved per call in this order:
+
+| Priority | Source | Notes |
+| :--- | :--- | :--- |
+| 1 | `workspace_root` argument | Absolute path to your project. Remembered for all later `workboard` calls in this server session. Must be an existing directory. |
+| 2 | `WORKBOARD_ROOT` env var | Set in the MCP server launch config. |
+| 3 | MCP client workspace root | Used automatically if your client advertises roots. |
+| 4 | EDA_MCP server repo | Legacy fallback; `status` shows `Root Source: server default ...`. |
+
+**Rule**: On the first `workboard` call of a session, pass `workspace_root="<absolute path of your project>"`. Then check `Local Root` / `Root Source` in the result. Paths ending in `/workboard` are used as-is (no extra `workboard/` is appended). Changing the root clears the remembered active WorkBoard, so pass `workboard_name` again.
+
+Every `add`/`export`/`pull`/`push` result prints `Local file: <absolute path>`; use that path to read/edit the file.
+
+```text
+workboard(action="status", workspace_root="/Users/me/AnalogMind", workboard_name="inverter_sim")
+```
 
 `local_path` is relative to the selected WorkBoard root, not an arbitrary workspace path. To create a new simulation deck, first initialize/select a board, then create the file at `./workboard/<workboard_name>/<local_path>` before calling `export`.
 
 ### Local Deck Authoring Protocol
-To write `./workboard/<name>/tb_<cell>.cir`:
+To write `<workspace_root>/workboard/<name>/tb_<cell>.cir`:
 - Use `write_to_file` WITHOUT `ArtifactMetadata` (ArtifactMetadata is strictly for artifact directory files; passing it for workspace files causes validation errors).
 - Alternatively, write `./workboard/<name>/tb_<cell>.txt` then run `mv ./workboard/<name>/tb_<cell>.txt ./workboard/<name>/tb_<cell>.cir`.
 - Export: `workboard(action="export", workboard_name="<name>", local_path="tb_<cell>.cir", remote_path="~/Desktop/eldo/tb_<cell>.cir")`.
@@ -16,11 +34,17 @@ To write `./workboard/<name>/tb_<cell>.cir`:
 Example lifecycle:
 
 ```text
-workboard(action="initialize", workboard_name="inverter_sim")
+workboard(action="initialize", workboard_name="inverter_sim", workspace_root="/abs/path/to/project")
 # write ./workboard/inverter_sim/tb_inverter.txt -> mv to tb_inverter.cir
 workboard(action="export", workboard_name="inverter_sim",
           local_path="tb_inverter.cir", remote_path="~/Desktop/eldo/tb_inverter.cir")
 ```
+
+### Remote Path Rules
+- Remote paths may only contain letters, digits and `_ . / ~ + = , @ % : -` (no spaces, wildcards, quotes, `;`, `|`, `&`, `$`) and must not start with `-`. Other paths are rejected before any transfer.
+- `export` and `push` destinations must be inside the command guard's allowed directories (default `~/Desktop/cmos65`, `~/Desktop/eldo`, `/tmp`). Files you `add` from elsewhere (e.g. `/modelfile_65nm/*.cir`) can be read and pulled but not pushed back.
+- Parallel `workboard` calls are safe: they run one at a time on the server, so issuing several `add`/`pull` calls at once is fine (they simply queue).
+- If a transfer fails or times out, the previous local copy is kept unchanged.
 
 When more than one WorkBoard exists, pass `workboard_name` on every operation unless the current server session has already selected one. That selection is session-local; do not assume it persists across MCP server restarts.
 
@@ -41,7 +65,7 @@ When more than one WorkBoard exists, pass `workboard_name` on every operation un
 ---
 
 ## 3. Native Git Shell Navigation Commands
-Agent can execute terminal commands inside `./workboard/<name>/`:
+Agent can execute terminal commands inside `<workspace_root>/workboard/<name>/`:
 - Commit log: `git log -n 10 --oneline -- <local_path>`
 - Baseline state view: `git show <commit_sha>:<local_path>`
 - Revert file to baseline: `git checkout <commit_sha> -- <local_path>`
