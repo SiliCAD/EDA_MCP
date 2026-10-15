@@ -210,7 +210,7 @@ def eldo(
     action: str = "run_terminal_command",
     command: str = "",
     file_path: str = "",
-    layout: List[Dict[str, Any]] = None,
+    layout: List[Dict[str, Any]] | None = None,
     work_dir: str = "~/Desktop/eldo",
     timeout: float = 30.0
 ) -> str:
