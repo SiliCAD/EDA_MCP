@@ -12,6 +12,7 @@ from mcp.server.fastmcp import FastMCP, Context
 from src.core.ssh_client import RemoteSession
 from src.core.scp_client import SCPClient, validate_remote_path
 from src.core.command_guard import CommandGuard
+from src.core.observer import ObserverPort, append_notices, blocked_result
 from src.clients.virtuoso_client import VirtuosoClient
 from src.clients.eldo_client import EldoClient
 from src.clients.workboard_client import WorkBoardClient
@@ -73,6 +74,29 @@ command_guard = CommandGuard.from_config(
     audit_log_path=os.path.join(logs_dir, "remote_commands_audit.jsonl"),
 )
 logger.info(f"Command guard {'enabled' if command_guard.enabled else 'DISABLED'}; allowed dirs: {command_guard.allowed_dirs}")
+observer = ObserverPort.from_env()
+logger.info(f"Observer port {'plugged in: ' + observer.url if observer.enabled else 'not configured (EDA_MCP_OBSERVER_URL unset)'}")
+
+def _observed(tool: str, action: str, args: dict, stage: str, why: str, run) -> str:
+    """Runs a tool body between the observer's before/after hooks (no-ops when no observer is plugged in)."""
+    call_id, block_msg, notices = observer.before(tool, action, args, stage, why)
+    if block_msg:
+        return append_notices(blocked_result(block_msg), notices)
+    start = time.time()
+    res = run()
+    notices += observer.after(call_id, tool, action, args, res, time.time() - start, stage, why)
+    return append_notices(res, notices)
+
+async def _observed_async(tool: str, action: str, args: dict, stage: str, why: str, run) -> str:
+    """_observed for async tool bodies; the HTTP hooks run off the event loop."""
+    call_id, block_msg, notices = await anyio.to_thread.run_sync(lambda: observer.before(tool, action, args, stage, why))
+    if block_msg:
+        return append_notices(blocked_result(block_msg), notices)
+    start = time.time()
+    res = await run()
+    notices += await anyio.to_thread.run_sync(
+        lambda: observer.after(call_id, tool, action, args, res, time.time() - start, stage, why))
+    return append_notices(res, notices)
 
 def _guard_command(tool: str, command: str, cwd: str = None, dry_run: bool = False) -> str:
     """Runs CommandGuard on a shell command. Returns an error/dry-run message to return instead of executing, or ""."""
@@ -96,7 +120,8 @@ def _format_result_summary(res: str, max_len: int = 300) -> str:
     return clean
 
 @mcp.tool()
-def remote_control(action: str, command: str = "", path: str = "", content: str = "", timeout: float = 60.0, dry_run: bool = False) -> str:
+def remote_control(action: str, command: str = "", path: str = "", content: str = "", timeout: float = 60.0, dry_run: bool = False,
+                   stage: str = "", why: str = "") -> str:
     """
     Execute shell commands and perform file operations on the remote EDA server.
     
@@ -107,10 +132,19 @@ def remote_control(action: str, command: str = "", path: str = "", content: str 
         content: Text content to write when action='write_file'
         timeout: Maximum wait time in seconds for execution (default: 60.0)
         dry_run: If True, only report whether the command guard would allow 'run_command'/'write_file' (nothing is executed)
+        stage: Optional. Design stage this call serves: 'schematic', 'sim', 'floorplan', 'route', 'drc', 'lvs',
+               'pex', 'tool_problem' or 'other'. Lets a plugged-in watcher check the call fits the task.
+        why: Optional. One short line (15 words or fewer) on why you are making this call.
 
     Safety guard: destructive commands (rm, mv, chmod, redirects, ...) may only target paths inside the
     allowed directories (default ~/Desktop/cmos65, ~/Desktop/eldo, /tmp); mkfs/dd/shutdown etc. are always blocked.
+
+    A result may end with a '[harness_notice]' block: guidance from the user, sent through the watcher.
     """
+    return _observed("remote_control", action, {"command": command, "path": path, "content_len": len(content), "dry_run": dry_run},
+                     stage, why, lambda: _remote_control(action, command, path, content, timeout, dry_run))
+
+def _remote_control(action: str, command: str, path: str, content: str, timeout: float, dry_run: bool) -> str:
     logger.info(f"[TOOL CALL] remote_control: action={action!r}, command={command!r}, path={path!r}, content_len={len(content)}, timeout={timeout}, dry_run={dry_run}")
     start_time = time.time()
     act = action.lower().strip()
@@ -161,7 +195,8 @@ def remote_control(action: str, command: str = "", path: str = "", content: str 
         return f"Error in remote_control tool: {str(e)}"
 
 @mcp.tool()
-def virtuoso(action: str, command: str = "", work_dir: str = "~/Desktop/cmos65", timeout: float = 30.0) -> str:
+def virtuoso(action: str, command: str = "", work_dir: str = "~/Desktop/cmos65", timeout: float = 30.0,
+             stage: str = "", why: str = "") -> str:
     """
     Control and interact with Cadence Virtuoso.
     
@@ -170,7 +205,16 @@ def virtuoso(action: str, command: str = "", work_dir: str = "~/Desktop/cmos65",
         command: SKILL code when action='assisted_run'/'standalone', or shell command when action='run_terminal_command'
         work_dir: Working directory for session execution (default: ~/Desktop/cmos65)
         timeout: Maximum wait time in seconds for execution/response (default: 30.0)
+        stage: Optional. Design stage this call serves: 'schematic', 'sim', 'floorplan', 'route', 'drc', 'lvs',
+               'pex', 'tool_problem' or 'other'. Lets a plugged-in watcher check the call fits the task.
+        why: Optional. One short line (15 words or fewer) on why you are making this call.
+
+    A result may end with a '[harness_notice]' block: guidance from the user, sent through the watcher.
     """
+    return _observed("virtuoso", action, {"command": command, "work_dir": work_dir}, stage, why,
+                     lambda: _virtuoso(action, command, work_dir, timeout))
+
+def _virtuoso(action: str, command: str, work_dir: str, timeout: float) -> str:
     logger.info(f"[TOOL CALL] virtuoso: action={action!r}, command={command!r}, work_dir={work_dir!r}, timeout={timeout}")
     start_time = time.time()
     try:
@@ -212,7 +256,9 @@ def eldo(
     file_path: str = "",
     layout: List[Dict[str, Any]] = None,
     work_dir: str = "~/Desktop/eldo",
-    timeout: float = 30.0
+    timeout: float = 30.0,
+    stage: str = "",
+    why: str = ""
 ) -> str:
     """
     Control and interact with Siemens/Mentor Graphics Eldo simulator and waveform visualizer.
@@ -225,7 +271,16 @@ def eldo(
                 Each object MUST contain 'pane_title' (string) and 'signals' (list of strings).
         work_dir: Working directory for simulation execution (defaults to ~/Desktop/eldo if not specified)
         timeout: Maximum wait time in seconds for execution/response (default: 30.0)
+        stage: Optional. Design stage this call serves: 'schematic', 'sim', 'floorplan', 'route', 'drc', 'lvs',
+               'pex', 'tool_problem' or 'other'. Lets a plugged-in watcher check the call fits the task.
+        why: Optional. One short line (15 words or fewer) on why you are making this call.
+
+    A result may end with a '[harness_notice]' block: guidance from the user, sent through the watcher.
     """
+    return _observed("eldo", action, {"command": command, "file_path": file_path, "work_dir": work_dir}, stage, why,
+                     lambda: _eldo(action, command, file_path, layout, work_dir, timeout))
+
+def _eldo(action: str, command: str, file_path: str, layout: List[Dict[str, Any]], work_dir: str, timeout: float) -> str:
     logger.info(f"[TOOL CALL] eldo: action={action!r}, command={command!r}, file_path={file_path!r}, layout_panes={len(layout) if layout else 0}, work_dir={work_dir!r}, timeout={timeout}")
     start_time = time.time()
     try:
@@ -353,6 +408,8 @@ async def workboard(
     overwrite: bool = False,
     timeout: float = 180.0,
     workspace_root: str = "",
+    stage: str = "",
+    why: str = "",
     ctx: Context = None
 ) -> str:
     """
@@ -374,7 +431,21 @@ async def workboard(
       - 'diff': Display unified diff between local WorkBoard file and remote server version.
       - 'status': List all tracked files and their status for a specific WorkBoard.
       - 'history': Display local Git commit history for a specific file or workspace.
+
+    Args:
+        stage: Optional. Design stage this call serves: 'schematic', 'sim', 'floorplan', 'route', 'drc', 'lvs',
+               'pex', 'tool_problem' or 'other'. Lets a plugged-in watcher check the call fits the task.
+        why: Optional. One short line (15 words or fewer) on why you are making this call.
+
+    A result may end with a '[harness_notice]' block: guidance from the user, sent through the watcher.
     """
+    async def run():
+        return await _workboard(action, workboard_name, remote_path, local_path, message, overwrite, timeout, workspace_root, ctx)
+    return await _observed_async("workboard", action, {"workboard_name": workboard_name, "remote_path": remote_path,
+                                                       "local_path": local_path}, stage, why, run)
+
+async def _workboard(action: str, workboard_name: str, remote_path: str, local_path: str, message: str,
+                     overwrite: bool, timeout: float, workspace_root: str, ctx: Context) -> str:
     logger.info(f"[TOOL CALL] workboard: action={action!r}, workboard_name={workboard_name!r}, remote_path={remote_path!r}, local_path={local_path!r}, workspace_root={workspace_root!r}")
     async with _workboard_lock:
         root_err = await _resolve_workboard_root(workspace_root, ctx)

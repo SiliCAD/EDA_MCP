@@ -358,6 +358,11 @@ Add a Stdio MCP server entry:
 claude mcp add eda-mcp -- python3 /absolute/path/to/EDA_MCP/server.py
 ```
 
+### Plugging in an observer (optional)
+Set `EDA_MCP_OBSERVER_URL` (e.g. `http://127.0.0.1:8770`) in the server's environment to let an
+outside watcher see each tool call, block unsafe ones and attach notices to results. Unset, nothing
+changes. Protocol and env vars: [doc/observer_port.md](doc/observer_port.md).
+
 ---
 
 ## 📊 SPICE Waveform Visualizer (`eldo_plotter.py`)

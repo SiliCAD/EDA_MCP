@@ -25,8 +25,18 @@ class TestDaemon(unittest.TestCase):
             action="assisted_run",
             command="plus(50 50)",
             work_dir="~/Desktop/cmos65",
-            timeout=60.0
+            timeout=60.0,
+            stage="",
+            why=""
         )
+
+    @patch("daemon.virtuoso")
+    def test_stage_and_why_pass_through(self, mock_virtuoso):
+        mock_virtuoso.return_value = "RESULT: t"
+        self.test_client.post("/virtuoso", json={"action": "assisted_run", "command": "t",
+                                                 "stage": "floorplan", "why": "place the pair"})
+        kwargs = mock_virtuoso.call_args.kwargs
+        self.assertEqual((kwargs["stage"], kwargs["why"]), ("floorplan", "place the pair"))
 
     @patch("daemon.eldo")
     def test_eldo_endpoint(self, mock_eldo):

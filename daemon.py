@@ -18,7 +18,10 @@ if base_dir not in sys.path:
     sys.path.insert(0, base_dir)
 
 # Import existing tool functions from EDA_MCP
-from src.server import virtuoso, eldo, workboard, remote_control, logger
+from src.server import virtuoso, eldo, workboard, remote_control, logger, observer
+
+# Calls through the daemon come from scripts and Arsenal, not an agent's own MCP session
+observer.source = "daemon"
 
 app = FastAPI(
     title="EDA_MCP Background Daemon",
@@ -39,6 +42,8 @@ class ToolPayload(BaseModel):
     overwrite: Optional[bool] = False
     timeout: Optional[float] = 60.0
     workspace_root: Optional[str] = ""
+    stage: Optional[str] = ""
+    why: Optional[str] = ""
 
 @app.get("/health")
 def health_check():
@@ -48,13 +53,15 @@ def health_check():
 @app.post("/virtuoso")
 def api_virtuoso(p: ToolPayload):
     """Executes Virtuoso actions (assisted_run, standalone, etc.)."""
-    res = virtuoso(action=p.action, command=p.command, work_dir=p.work_dir or "~/Desktop/cmos65", timeout=p.timeout)
+    res = virtuoso(action=p.action, command=p.command, work_dir=p.work_dir or "~/Desktop/cmos65", timeout=p.timeout,
+                   stage=p.stage or "", why=p.why or "")
     return {"result": res}
 
 @app.post("/eldo")
 def api_eldo(p: ToolPayload):
     """Executes Eldo simulation actions (run_terminal_command, run_script, etc.)."""
-    res = eldo(action=p.action, command=p.command, work_dir=p.work_dir or "~/Desktop/cmos65", timeout=p.timeout)
+    res = eldo(action=p.action, command=p.command, work_dir=p.work_dir or "~/Desktop/cmos65", timeout=p.timeout,
+               stage=p.stage or "", why=p.why or "")
     return {"result": res}
 
 @app.post("/workboard")
@@ -68,14 +75,17 @@ async def api_workboard(p: ToolPayload):
         message=p.message,
         overwrite=p.overwrite,
         timeout=p.timeout if "timeout" in p.model_fields_set else 180.0,  # match the MCP tool default
-        workspace_root=p.workspace_root or ""
+        workspace_root=p.workspace_root or "",
+        stage=p.stage or "",
+        why=p.why or ""
     )
     return {"result": res}
 
 @app.post("/remote_control")
 def api_remote_control(p: ToolPayload):
     """Executes shell commands or direct file I/O on the remote server."""
-    res = remote_control(action=p.action, command=p.command, path=p.path, content=p.content, timeout=p.timeout)
+    res = remote_control(action=p.action, command=p.command, path=p.path, content=p.content, timeout=p.timeout,
+                         stage=p.stage or "", why=p.why or "")
     return {"result": res}
 
 def run_daemon(host: str = "127.0.0.1", port: int = 8765):
