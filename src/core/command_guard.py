@@ -22,6 +22,23 @@ BLOCKED_PATTERNS: List[Tuple[str, str]] = [
     (r":\(\)\s*\{\s*:\s*\|\s*:\s*&\s*\}", "fork bomb"),
 ]
 
+# tcsh, the login shell on the EDA server, expands '!word' as history even inside single quotes; the
+# failed expansion leaves the persistent SSH shell waiting until the call times out (#62, #69).
+# '!' before a blank, '=', '(' or the end of the command is not expanded.
+HISTORY_BANG = re.compile(r"!(?![\s=(]|$)")
+HISTORY_BANG_REASON = "Blocked: '!' followed by a word"
+
+
+def history_bang(command: str) -> str:
+    """Returns a block reason when the command contains '!word' (it would hang the shell), else ""."""
+    m = HISTORY_BANG.search(command or "")
+    if not m:
+        return ""
+    word = re.match(r"!\S{0,20}", command[m.start():]).group(0)
+    return (f"{HISTORY_BANG_REASON} ({word!r}) triggers history expansion in the server's shell and hangs the "
+            "call until it times out (EDA_MCP#62, #69). Rewrite it without '!': null(x) or x==nil in SKILL, "
+            "x==0 or test -z in shell. '!=' and '! ' are fine.")
+
 # Commands that modify or delete their path arguments.
 DESTRUCTIVE_CMDS = {"rm", "rmdir", "unlink", "shred", "truncate", "mv", "chmod", "chown", "chgrp", "tee", "cp", "ln"}
 # For these, only the last path argument (the destination) is written.
@@ -166,6 +183,9 @@ class CommandGuard:
         Returns (is_safe, reason). 'cwd' is the remote directory the command starts in when the
         caller knows it (e.g. tools that 'cd <work_dir>' first); relative paths resolve against it.
         """
+        bang = history_bang(command)    # a hang, not a policy: blocked even with the guard disabled
+        if bang:
+            return False, bang
         if not self.enabled:
             return True, "Command guard disabled"
         text = command.strip()
@@ -327,6 +347,8 @@ class CommandGuard:
             logger.error(f"Failed to write command audit log: {e}")
 
     def blocked_message(self, reason: str) -> str:
+        if reason.startswith(HISTORY_BANG_REASON):
+            return f"Error: {reason}\nThe command was NOT executed."
         return (
             f"Error: {reason}\n"
             f"The command was NOT executed. Destructive operations are only allowed inside: {', '.join(self.allowed_dirs)}.\n"
