@@ -31,5 +31,19 @@ class TestVirtuosoAutoInit(unittest.TestCase):
         self.assertEqual(self.client.workdir, "~/Desktop/custom_dir")
         self.assertEqual(res, "RESULT: 5")
 
+    def test_assisted_run_large_payload_via_scp(self):
+        mock_scp = MagicMock()
+        self.client.scp = mock_scp
+        
+        # Payload > 32KB
+        large_skill = "plus(1 1) " * 5000
+        res = self.client.assisted_run(skill_code=large_skill, work_dir="~/Desktop/cmos65")
+        
+        self.assertEqual(res, "RESULT: 5")
+        mock_scp.upload.assert_called_once()
+        # Ensure cat command was sent to FIFO pipe
+        exec_cmds = [call[0][0] for call in self.mock_session.execute_command.call_args_list]
+        self.assertTrue(any("cat /tmp/mcp_skill_" in cmd and "> MCP.command" in cmd for cmd in exec_cmds))
+
 if __name__ == "__main__":
     unittest.main()
