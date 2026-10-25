@@ -13,7 +13,7 @@ from src.core.ssh_client import RemoteSession
 from src.core.scp_client import SCPClient, validate_remote_path
 from src.core.command_guard import CommandGuard
 from src.core.observer import ObserverPort, append_notices, blocked_result
-from src.clients.virtuoso_client import VirtuosoClient
+from src.clients.virtuoso_client import VirtuosoClient, DEFAULT_WORK_DIR
 from src.clients.eldo_client import EldoClient
 from src.clients.workboard_client import WorkBoardClient
 from src.issue_reporter import IssueReporter
@@ -195,15 +195,13 @@ def _remote_control(action: str, command: str, path: str, content: str, timeout:
         return f"Error in remote_control tool: {str(e)}"
 
 @mcp.tool()
-def virtuoso(action: str, command: str = "", work_dir: str = "~/Desktop/cmos65", timeout: float = 30.0,
-             stage: str = "", why: str = "") -> str:
+def virtuoso(action: str, command: str = "", timeout: float = 30.0, stage: str = "", why: str = "") -> str:
     """
-    Control and interact with Cadence Virtuoso.
+    Control and interact with Cadence Virtuoso. Always runs in the Virtuoso session directory (~/Desktop/cmos65).
     
     Args:
         action: The operation to perform ('assisted_run', 'standalone', 'start_standalone', 'stop_standalone', 'run_terminal_command', 'exit')
         command: SKILL code when action='assisted_run'/'standalone', or shell command when action='run_terminal_command'
-        work_dir: Working directory for session execution (default: ~/Desktop/cmos65)
         timeout: Maximum wait time in seconds for execution/response (default: 30.0)
         stage: Optional. Design stage this call serves: 'schematic', 'sim', 'floorplan', 'route', 'drc', 'lvs',
                'pex', 'tool_problem' or 'other'. Lets a plugged-in watcher check the call fits the task.
@@ -211,11 +209,11 @@ def virtuoso(action: str, command: str = "", work_dir: str = "~/Desktop/cmos65",
 
     A result may end with a '[harness_notice]' block: guidance from the user, sent through the watcher.
     """
-    return _observed("virtuoso", action, {"command": command, "work_dir": work_dir}, stage, why,
-                     lambda: _virtuoso(action, command, work_dir, timeout))
+    return _observed("virtuoso", action, {"command": command}, stage, why,
+                     lambda: _virtuoso(action, command, timeout))
 
-def _virtuoso(action: str, command: str, work_dir: str, timeout: float) -> str:
-    logger.info(f"[TOOL CALL] virtuoso: action={action!r}, command={command!r}, work_dir={work_dir!r}, timeout={timeout}")
+def _virtuoso(action: str, command: str, timeout: float) -> str:
+    logger.info(f"[TOOL CALL] virtuoso: action={action!r}, command={command!r}, timeout={timeout}")
     start_time = time.time()
     try:
         act = action.lower().strip()
@@ -223,19 +221,19 @@ def _virtuoso(action: str, command: str, work_dir: str, timeout: float) -> str:
             if not command.strip():
                 res = "Error: 'command' argument is required when action='assisted_run'."
             else:
-                res = virtuoso_client.assisted_run(skill_code=command, work_dir=work_dir, timeout=timeout)
+                res = virtuoso_client.assisted_run(skill_code=command, work_dir=DEFAULT_WORK_DIR, timeout=timeout)
         elif act in ("standalone", "run_standalone"):
-            res = virtuoso_standalone_client.run_standalone(command=command, work_dir=work_dir, timeout=timeout)
+            res = virtuoso_standalone_client.run_standalone(command=command, work_dir=DEFAULT_WORK_DIR, timeout=timeout)
         elif act in ("start_standalone", "start"):
-            res = virtuoso_standalone_client.start_standalone(work_dir=work_dir)
+            res = virtuoso_standalone_client.start_standalone(work_dir=DEFAULT_WORK_DIR)
         elif act in ("stop_standalone", "stop"):
             res = virtuoso_standalone_client.stop_standalone()
         elif act in ("run_terminal_command", "terminal_command", "run_terminal", "terminal", "cmd", "shell"):
             if not command.strip():
                 res = "Error: 'command' argument is required when action='run_terminal_command'."
             else:
-                res = _guard_command("virtuoso", command, cwd=work_dir) or \
-                    virtuoso_client.run_terminal_command(command=command, work_dir=work_dir, timeout=timeout)
+                res = _guard_command("virtuoso", command, cwd=DEFAULT_WORK_DIR) or \
+                    virtuoso_client.run_terminal_command(command=command, work_dir=DEFAULT_WORK_DIR, timeout=timeout)
         elif act == "exit":
             res = virtuoso_client.exit()
         else:
@@ -254,7 +252,7 @@ def eldo(
     action: str = "run_terminal_command",
     command: str = "",
     file_path: str = "",
-    layout: List[Dict[str, Any]] = None,
+    layout: List[Dict[str, Any]] | None = None,
     work_dir: str = "~/Desktop/eldo",
     timeout: float = 30.0,
     stage: str = "",
@@ -280,7 +278,7 @@ def eldo(
     return _observed("eldo", action, {"command": command, "file_path": file_path, "work_dir": work_dir}, stage, why,
                      lambda: _eldo(action, command, file_path, layout, work_dir, timeout))
 
-def _eldo(action: str, command: str, file_path: str, layout: List[Dict[str, Any]], work_dir: str, timeout: float) -> str:
+def _eldo(action: str, command: str, file_path: str, layout: List[Dict[str, Any]] | None, work_dir: str, timeout: float) -> str:
     logger.info(f"[TOOL CALL] eldo: action={action!r}, command={command!r}, file_path={file_path!r}, layout_panes={len(layout) if layout else 0}, work_dir={work_dir!r}, timeout={timeout}")
     start_time = time.time()
     try:

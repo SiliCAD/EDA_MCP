@@ -36,7 +36,7 @@ Both hooks are `POST` with a JSON body and expect a JSON answer.
 ```json
 {"v": 1, "call_id": "hex", "session": "eda-mcp:4242", "source": "mcp",
  "tool": "virtuoso", "action": "assisted_run",
- "args": {"command": "...", "work_dir": "~/Desktop/cmos65"},
+ "args": {"command": "..."},
  "stage": "schematic", "why": "wire the mirror", "ts": 1761370000.0}
 ```
 Answer: `{"decision": "allow" | "block", "message": "why blocked", "notices": [{"severity": "hint|warn|block", "text": "..."}]}`

@@ -53,8 +53,7 @@ def health_check():
 @app.post("/virtuoso")
 def api_virtuoso(p: ToolPayload):
     """Executes Virtuoso actions (assisted_run, standalone, etc.)."""
-    res = virtuoso(action=p.action, command=p.command, work_dir=p.work_dir or "~/Desktop/cmos65", timeout=p.timeout,
-                   stage=p.stage or "", why=p.why or "")
+    res = virtuoso(action=p.action, command=p.command, timeout=p.timeout, stage=p.stage or "", why=p.why or "")
     return {"result": res}
 
 @app.post("/eldo")

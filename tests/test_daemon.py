@@ -24,7 +24,6 @@ class TestDaemon(unittest.TestCase):
         mock_virtuoso.assert_called_once_with(
             action="assisted_run",
             command="plus(50 50)",
-            work_dir="~/Desktop/cmos65",
             timeout=60.0,
             stage="",
             why=""

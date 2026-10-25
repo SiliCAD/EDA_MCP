@@ -6,17 +6,21 @@ import logging
 from typing import Optional
 from filelock import FileLock, Timeout
 from src.core.ssh_client import RemoteSession
+from src.core.scp_client import SCPClient
+from src.core.command_guard import history_bang
 
 logger = logging.getLogger("eda_mcp.virtuoso_client")
 
 DEFAULT_LOCK_PATH = os.path.join(tempfile.gettempdir(), "virtuoso_fifo.lock")
+DEFAULT_WORK_DIR = "~/Desktop/cmos65"
+
 
 class VirtuosoClient:
     """
     High-level client for managing and executing SKILL commands in Cadence Virtuoso
     over a RemoteSession SSH transport.
     """
-    def __init__(self, session: RemoteSession, lock_path: Optional[str] = None):
+    def __init__(self, session: RemoteSession, lock_path: Optional[str] = None, scp_client: Optional[SCPClient] = None):
         self.session = session
         self.pid = None
         self.workdir = None
@@ -24,6 +28,16 @@ class VirtuosoClient:
         self.standalone_workdir = None
         self.lock_path = lock_path or DEFAULT_LOCK_PATH
         self.fifo_lock = FileLock(self.lock_path, timeout=120.0)
+        if scp_client:
+            self.scp = scp_client
+        else:
+            try:
+                base_dir = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
+                cfg_path = os.path.join(base_dir, "config", "config_remote_control.json")
+                self.scp = SCPClient(config_path=cfg_path)
+            except Exception as e:
+                logger.warning(f"Failed to initialize SCPClient in VirtuosoClient: {e}")
+                self.scp = None
 
     def start_standalone(self, work_dir: str = "~/Desktop/cmos65") -> str:
         """
@@ -197,6 +211,10 @@ class VirtuosoClient:
         Auto-initializes session working directory if not yet initialized.
         Protected by cross-process FIFO FileLock to prevent race conditions.
         """
+        # The FIFO write goes through the server's shell, which expands '!word' and hangs (#69)
+        bang = history_bang(skill_code)
+        if bang:
+            return f"Error: {bang}\nThe SKILL command was NOT sent to Virtuoso."
         try:
             with self.fifo_lock:
                 self.session.connect()
@@ -221,8 +239,25 @@ class VirtuosoClient:
                 self.session.execute_command(f"rm -f {output_file} && touch {output_file}")
                 
                 # Write command directly to FIFO pipe MCP.command
-                fifo_write_cmd = f"printf '%s\\n' {shlex.quote(clean_skill)} > MCP.command"
-                exit_code, out, _ = self.session.execute_command(fifo_write_cmd)
+                # If command is large (> 32KB) and SCP client is available, transfer via SCP
+                # and stream to FIFO via cat to avoid OS ARG_MAX / MAX_ARG_STRLEN (128KB) E2BIG execve errors.
+                if len(clean_skill) > 32768 and self.scp is not None:
+                    import uuid
+                    tmp_remote = f"/tmp/mcp_skill_{int(time.time())}_{uuid.uuid4().hex[:8]}.il"
+                    with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".il") as tmp_local:
+                        tmp_local.write(clean_skill + "\n")
+                        local_path = tmp_local.name
+                    try:
+                        self.scp.upload(local_path, tmp_remote)
+                        fifo_write_cmd = f"cat {tmp_remote} > MCP.command && rm -f {tmp_remote}"
+                        exit_code, out, _ = self.session.execute_command(fifo_write_cmd)
+                    finally:
+                        if os.path.exists(local_path):
+                            os.unlink(local_path)
+                else:
+                    fifo_write_cmd = f"printf '%s\\n' {shlex.quote(clean_skill)} > MCP.command"
+                    exit_code, out, _ = self.session.execute_command(fifo_write_cmd)
+
                 if exit_code != 0:
                     return f"Failed to send command to Virtuoso FIFO pipe: {out}"
                     
@@ -263,7 +298,9 @@ class VirtuosoClient:
         target_dir = (work_dir.strip() if work_dir and work_dir.strip() else None) or self.workdir
         if target_dir:
             safe_dir = f"$HOME{target_dir[1:]}" if target_dir.startswith("~") else shlex.quote(target_dir)
-            self.session.execute_command(f"cd {safe_dir}")
+            cd_code, _, _ = self.session.execute_command(f"cd {safe_dir}")
+            if cd_code != 0:
+                return f"Error: could not cd to '{target_dir}' on the EDA server. The command was NOT run."
             
         exec_cmd = f"bash -c {shlex.quote(command)}" if (use_bash and not command.strip().startswith("bash")) else command
         exit_code, stdout, stderr = self.session.execute_command(exec_cmd, timeout=timeout)
