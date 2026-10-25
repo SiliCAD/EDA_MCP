@@ -45,6 +45,10 @@ jobs:
       run: |
         python -m unittest discover -s tests -p "test_virtuoso_work_dir.py"
 
+    - name: Run Virtuoso assisted_run Tests (auto-init, large SKILL over SCP)
+      run: |
+        python -m unittest discover -s tests -p "test_virtuoso_auto_init.py"
+
     - name: Run WorkBoard Hardening Tests (concurrency, git, SCP)
       run: |
         python -m unittest discover -s tests -p "test_workboard_hardening.py"
