@@ -13,17 +13,6 @@ DEFAULT_LOCK_PATH = os.path.join(tempfile.gettempdir(), "virtuoso_fifo.lock")
 DEFAULT_WORK_DIR = "~/Desktop/cmos65"
 
 
-def _remote_dir(path: str) -> str:
-    """Shell-safe form of a remote directory, keeping ~ expandable."""
-    return f"$HOME{shlex.quote(path[1:])}" if path.startswith("~") else shlex.quote(path)
-
-
-def _work_dir_hint(work_dir: str) -> str:
-    """Extra hint when work_dir is clearly a path on this machine rather than the EDA server."""
-    if work_dir.startswith(("/Users/", "C:\\", "C:/")) or (os.path.isabs(work_dir) and os.path.isdir(work_dir)):
-        return " That looks like a path on this machine, not on the EDA server."
-    return ""
-
 class VirtuosoClient:
     """
     High-level client for managing and executing SKILL commands in Cadence Virtuoso
@@ -187,19 +176,6 @@ class VirtuosoClient:
 
         return "".join(final_chars).strip()
 
-    def _check_work_dir(self, work_dir: str) -> str:
-        """
-        Issue #76: work_dir must hold the Virtuoso FIFO (MCP.command) of a live session. Writing to a
-        directory without one makes every later call time out ("reading SSH stream"), which looks like
-        server load. Returns an error string, or "" when the pipe is there.
-        """
-        exit_code, _, _ = self.session.execute_command(f"test -p {_remote_dir(work_dir)}/MCP.command")
-        if exit_code == 0:
-            return ""
-        return (f"Error: work_dir '{work_dir}' has no Virtuoso session: there is no MCP.command pipe in it on the "
-                f"EDA server.{_work_dir_hint(work_dir)} Leave work_dir at its default ({DEFAULT_WORK_DIR}) unless "
-                f"the user named another session's directory. Nothing was sent to Virtuoso.")
-
     def _initialize(self, work_dir: str = "~/Desktop/cmos65") -> str:
         """
         Navigates to work_dir, executes MCP_initalize.sh, and tracks the Virtuoso PID.
@@ -230,11 +206,6 @@ class VirtuosoClient:
 
                 if not self.workdir:
                     logger.info("assisted_run auto-initializing Virtuoso session...")
-                    # Validate before the directory becomes sticky for the rest of the session
-                    bad_dir = self._check_work_dir(target_dir)
-                    if bad_dir:
-                        logger.warning(f"assisted_run rejected work_dir {target_dir!r}: no MCP.command pipe")
-                        return bad_dir
                     init_res = self._initialize(work_dir=target_dir)
                     if "Failed to initialize" in init_res:
                         return init_res
@@ -296,8 +267,7 @@ class VirtuosoClient:
             safe_dir = f"$HOME{target_dir[1:]}" if target_dir.startswith("~") else shlex.quote(target_dir)
             cd_code, _, _ = self.session.execute_command(f"cd {safe_dir}")
             if cd_code != 0:
-                return (f"Error: work_dir '{target_dir}' does not exist on the EDA server.{_work_dir_hint(target_dir)} "
-                        f"The command was NOT run. Leave work_dir at its default unless the user named another directory.")
+                return f"Error: could not cd to '{target_dir}' on the EDA server. The command was NOT run."
             
         exec_cmd = f"bash -c {shlex.quote(command)}" if (use_bash and not command.strip().startswith("bash")) else command
         exit_code, stdout, stderr = self.session.execute_command(exec_cmd, timeout=timeout)
