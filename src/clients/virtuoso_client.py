@@ -6,6 +6,7 @@ import logging
 from typing import Optional
 from filelock import FileLock, Timeout
 from src.core.ssh_client import RemoteSession
+from src.core.command_guard import history_bang
 
 logger = logging.getLogger("eda_mcp.virtuoso_client")
 
@@ -199,6 +200,10 @@ class VirtuosoClient:
         Auto-initializes session working directory if not yet initialized.
         Protected by cross-process FIFO FileLock to prevent race conditions.
         """
+        # The FIFO write goes through the server's shell, which expands '!word' and hangs (#69)
+        bang = history_bang(skill_code)
+        if bang:
+            return f"Error: {bang}\nThe SKILL command was NOT sent to Virtuoso."
         try:
             with self.fifo_lock:
                 self.session.connect()
