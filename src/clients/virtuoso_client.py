@@ -7,10 +7,13 @@ from typing import Optional
 from filelock import FileLock, Timeout
 from src.core.ssh_client import RemoteSession
 from src.core.scp_client import SCPClient
+from src.core.command_guard import history_bang
 
 logger = logging.getLogger("eda_mcp.virtuoso_client")
 
 DEFAULT_LOCK_PATH = os.path.join(tempfile.gettempdir(), "virtuoso_fifo.lock")
+DEFAULT_WORK_DIR = "~/Desktop/cmos65"
+
 
 class VirtuosoClient:
     """
@@ -208,6 +211,10 @@ class VirtuosoClient:
         Auto-initializes session working directory if not yet initialized.
         Protected by cross-process FIFO FileLock to prevent race conditions.
         """
+        # The FIFO write goes through the server's shell, which expands '!word' and hangs (#69)
+        bang = history_bang(skill_code)
+        if bang:
+            return f"Error: {bang}\nThe SKILL command was NOT sent to Virtuoso."
         try:
             with self.fifo_lock:
                 self.session.connect()
@@ -291,7 +298,9 @@ class VirtuosoClient:
         target_dir = (work_dir.strip() if work_dir and work_dir.strip() else None) or self.workdir
         if target_dir:
             safe_dir = f"$HOME{target_dir[1:]}" if target_dir.startswith("~") else shlex.quote(target_dir)
-            self.session.execute_command(f"cd {safe_dir}")
+            cd_code, _, _ = self.session.execute_command(f"cd {safe_dir}")
+            if cd_code != 0:
+                return f"Error: could not cd to '{target_dir}' on the EDA server. The command was NOT run."
             
         exec_cmd = f"bash -c {shlex.quote(command)}" if (use_bash and not command.strip().startswith("bash")) else command
         exit_code, stdout, stderr = self.session.execute_command(exec_cmd, timeout=timeout)

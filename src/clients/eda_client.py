@@ -28,7 +28,6 @@ class EDADaemonClient:
         self,
         action: str = "assisted_run",
         command: str = "",
-        work_dir: Optional[str] = None,
         timeout: Optional[float] = None
     ) -> str:
         """
@@ -37,7 +36,6 @@ class EDADaemonClient:
         payload = {
             "action": action,
             "command": command,
-            "work_dir": work_dir,
             "timeout": timeout or 30.0
         }
         resp = self._client.post("/virtuoso", json=payload)

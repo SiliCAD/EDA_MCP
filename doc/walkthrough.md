@@ -65,7 +65,7 @@ eldo_session = RemoteSession(config_path="config/config_eldo.json")
 ```
 And registers three unified `@mcp.tool()` definitions:
 1. `remote_control(action, command="", path="", content="")`
-2. `virtuoso(action, command="", work_dir="~/Desktop/cmos65")`
+2. `virtuoso(action, command="")`
 3. `eldo(action, command="", work_dir="~/Desktop/eldo")`
 
 ---

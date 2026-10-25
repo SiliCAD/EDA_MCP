@@ -44,7 +44,7 @@ async def run_session_isolation_test():
             # Execute virtuoso terminal command in a different directory (~/Desktop/cmos65)
             v_res = await session.call_tool(
                 name="virtuoso",
-                arguments={"action": "run_terminal_command", "command": "pwd", "work_dir": "~/Desktop/cmos65"}
+                arguments={"action": "run_terminal_command", "command": "pwd"}
             )
             print(f"virtuoso output: {v_res.content[0].text.strip() if v_res.content else ''}")
 

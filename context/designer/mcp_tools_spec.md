@@ -29,7 +29,7 @@ Every agent-supplied shell command (`remote_control` `run_command`, and `virtuos
 | Targets must be verifiable | `rm -f tb.chi` (relative, unknown cwd), `rm -rf $(pwd)`, `rm -rf $VAR/x`, `ls \| xargs rm` | `cd ~/Desktop/eldo && rm -f tb.chi` |
 
 - Read-only commands (`ls`, `cat`, `grep`, `ps`, tool launches) are never restricted by path.
-- `virtuoso`/`eldo` `run_terminal_command` resolve relative paths against their `work_dir`, so `eldo tb.cir > tb.log` works.
+- `virtuoso` `run_terminal_command` resolves relative paths against `~/Desktop/cmos65`, and `eldo` against its `work_dir`, so `eldo tb.cir > tb.log` works.
 - Checks also apply inside `bash -c "..."`, `eval`, and chains joined by `;`, `&&`, `||`, newlines.
 - If a block is wrong for your task, do NOT try to rephrase around it; report it to the human user (they can edit `config/command_guard.json`).
 - The guard is a seatbelt against hallucinated commands, not a sandbox: it can't see inside script files (`python3 script.py`, `./run.sh`) or SKILL `system()` calls. Keep destructive work in explicit `rm`/`mv` commands on absolute paths.
@@ -58,8 +58,8 @@ type VirtuosoArgs = {
         | "run_terminal_command" | "terminal" | "shell"
         | "exit";
   command?: string;  // SKILL code string or terminal shell command
-  work_dir?: string; // Default: "~/Desktop/cmos65"
   timeout?: number;  // Default: 30.0s
+  // No work_dir: every action runs in the Virtuoso session directory, ~/Desktop/cmos65.
 };
 ```
 

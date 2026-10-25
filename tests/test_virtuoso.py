@@ -34,8 +34,7 @@ async def run_virtuoso_test():
                     name="virtuoso",
                     arguments={
                         "action": "assisted_run",
-                        "command": "plus(1 1)",
-                        "work_dir": "~/Desktop/cmos65"
+                        "command": "plus(1 1)"
                     }
                 )
                 
@@ -50,7 +49,7 @@ async def run_virtuoso_test():
                 print("\nTesting virtuoso action='start_standalone'...")
                 interact_start = await session.call_tool(
                     name="virtuoso",
-                    arguments={"action": "start_standalone", "work_dir": "~/Desktop/cmos65"}
+                    arguments={"action": "start_standalone"}
                 )
                 print(f"Start Standalone Response:\n{interact_start.content[0].text if interact_start.content else ''}")
 

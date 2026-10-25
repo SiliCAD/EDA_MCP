@@ -39,6 +39,11 @@ jobs:
       run: |
         python -m unittest discover -s tests -p "test_command_guard.py"
         python -m unittest discover -s tests -p "test_command_guard_server.py"
+        python -m unittest discover -s tests -p "test_history_bang.py"
+
+    - name: Run Virtuoso work_dir Tests (issue #76)
+      run: |
+        python -m unittest discover -s tests -p "test_virtuoso_work_dir.py"
 
     - name: Run Virtuoso assisted_run Tests (auto-init, large SKILL over SCP)
       run: |
