@@ -49,6 +49,10 @@ jobs:
       run: |
         python -m unittest discover -s tests -p "test_virtuoso_auto_init.py"
 
+    - name: Run Observer Port Tests
+      run: |
+        python -m unittest discover -s tests -p "test_observer_port.py"
+
     - name: Run WorkBoard Hardening Tests (concurrency, git, SCP)
       run: |
         python -m unittest discover -s tests -p "test_workboard_hardening.py"
