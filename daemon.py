@@ -8,6 +8,7 @@ a single active Cadence Virtuoso session without FIFO or cellview lock collision
 import os
 import sys
 import uvicorn
+from contextlib import contextmanager
 from fastapi import FastAPI
 from pydantic import BaseModel
 from typing import Optional
@@ -19,6 +20,7 @@ if base_dir not in sys.path:
 
 # Import existing tool functions from EDA_MCP
 from src.server import virtuoso, eldo, workboard, remote_control, logger, observer
+from src.core.observer import set_parent_call, reset_parent_call
 
 # Calls through the daemon come from scripts and Arsenal, not an agent's own MCP session
 observer.source = "daemon"
@@ -44,6 +46,17 @@ class ToolPayload(BaseModel):
     workspace_root: Optional[str] = ""
     stage: Optional[str] = ""
     why: Optional[str] = ""
+    parent_call_id: Optional[str] = ""     # the caller's observed call (e.g. an Arsenal tool) this request serves
+
+
+@contextmanager
+def _for_parent(p: ToolPayload):
+    """The observer events of this request carry the caller's parent_call_id."""
+    token = set_parent_call(p.parent_call_id or "")
+    try:
+        yield
+    finally:
+        reset_parent_call(token)
 
 @app.get("/health")
 def health_check():
@@ -53,38 +66,42 @@ def health_check():
 @app.post("/virtuoso")
 def api_virtuoso(p: ToolPayload):
     """Executes Virtuoso actions (assisted_run, standalone, etc.)."""
-    res = virtuoso(action=p.action, command=p.command, timeout=p.timeout, stage=p.stage or "", why=p.why or "")
+    with _for_parent(p):
+        res = virtuoso(action=p.action, command=p.command, timeout=p.timeout, stage=p.stage or "", why=p.why or "")
     return {"result": res}
 
 @app.post("/eldo")
 def api_eldo(p: ToolPayload):
     """Executes Eldo simulation actions (run_terminal_command, run_script, etc.)."""
-    res = eldo(action=p.action, command=p.command, work_dir=p.work_dir or "~/Desktop/cmos65", timeout=p.timeout,
-               stage=p.stage or "", why=p.why or "")
+    with _for_parent(p):
+        res = eldo(action=p.action, command=p.command, work_dir=p.work_dir or "~/Desktop/cmos65", timeout=p.timeout,
+                   stage=p.stage or "", why=p.why or "")
     return {"result": res}
 
 @app.post("/workboard")
 async def api_workboard(p: ToolPayload):
     """Executes WorkBoard local-remote workspace synchronization actions."""
-    res = await workboard(
-        action=p.action,
-        local_path=p.local_path,
-        remote_path=p.remote_path,
-        workboard_name=p.workboard_name,
-        message=p.message,
-        overwrite=p.overwrite,
-        timeout=p.timeout if "timeout" in p.model_fields_set else 180.0,  # match the MCP tool default
-        workspace_root=p.workspace_root or "",
-        stage=p.stage or "",
-        why=p.why or ""
-    )
+    with _for_parent(p):
+        res = await workboard(
+            action=p.action,
+            local_path=p.local_path,
+            remote_path=p.remote_path,
+            workboard_name=p.workboard_name,
+            message=p.message,
+            overwrite=p.overwrite,
+            timeout=p.timeout if "timeout" in p.model_fields_set else 180.0,  # match the MCP tool default
+            workspace_root=p.workspace_root or "",
+            stage=p.stage or "",
+            why=p.why or ""
+        )
     return {"result": res}
 
 @app.post("/remote_control")
 def api_remote_control(p: ToolPayload):
     """Executes shell commands or direct file I/O on the remote server."""
-    res = remote_control(action=p.action, command=p.command, path=p.path, content=p.content, timeout=p.timeout,
-                         stage=p.stage or "", why=p.why or "")
+    with _for_parent(p):
+        res = remote_control(action=p.action, command=p.command, path=p.path, content=p.content, timeout=p.timeout,
+                             stage=p.stage or "", why=p.why or "")
     return {"result": res}
 
 def run_daemon(host: str = "127.0.0.1", port: int = 8765):
